@@ -15,19 +15,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Install C++ Compiler & CMake
+      - name: Install C++ Compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ cmake make boost-all-dev libpq-dev libhiredis-dev
+          sudo apt-get install -y g++ cmake make
 
-      - name: Build C++ Server
+      - name: Build C++ Executable
         run: |
           g++ -O2 -std=c++17 backend/src/main.cpp -Ibackend/include -pthread -o backend/url_shortener_server
           chmod +x backend/url_shortener_server
 
-      - name: Verify Executable Build
+      - name: Verify C++ Build Success
         run: |
-          ls -la backend/url_shortener_server
+          ls -lh backend/url_shortener_server
 
   build-react-frontend:
     name: Build & Lint React Frontend
@@ -37,19 +37,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js Environment
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Frontend Dependencies
+      - name: Install Dependencies & Build Distribution
         run: |
           cd frontend
-          npm ci || npm install
-
-      - name: Build Production Distribution
-        run: |
-          cd frontend
+          npm install
           npm run build

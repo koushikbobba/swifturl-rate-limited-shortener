@@ -29,7 +29,7 @@ struct ClickLog {
 
 // Memory Storage + Redis Cache Simulation
 std::atomic<uint64_t> global_url_counter{100000};
-SimpleMutex db_mutex;
+CrossPlatformMutex db_mutex;
 std::unordered_map<std::string, UrlRecord> url_by_code;
 std::unordered_map<std::string, std::string> redis_cache;
 std::vector<ClickLog> click_analytics_logs;
@@ -101,7 +101,7 @@ int main() {
         std::string short_code = custom_slug.empty() ? Base62::encode(++global_url_counter) : custom_slug;
 
         {
-            db_mutex.lock();
+            ScopedLock lock(db_mutex);
             UrlRecord rec;
             rec.id = static_cast<int>(url_by_code.size() + 1);
             rec.user_id = 1;
@@ -115,7 +115,6 @@ int main() {
 
             url_by_code[short_code] = rec;
             redis_cache[short_code] = original_url;
-            db_mutex.unlock();
         }
 
         std::string res_json = R"({"status":"success","short_code":")" + short_code + 
@@ -133,7 +132,7 @@ int main() {
         bool cache_hit = false;
 
         {
-            db_mutex.lock();
+            ScopedLock lock(db_mutex);
             if (redis_cache.count(short_code)) {
                 target_url = redis_cache[short_code];
                 cache_hit = true;
@@ -141,7 +140,6 @@ int main() {
                 target_url = url_by_code[short_code].original_url;
                 redis_cache[short_code] = target_url;
             }
-            db_mutex.unlock();
         }
 
         if (target_url.empty()) {
@@ -163,11 +161,10 @@ int main() {
         if (!log_event.timestamp.empty()) log_event.timestamp.pop_back();
 
         {
-            db_mutex.lock();
+            ScopedLock lock(db_mutex);
             url_by_code[short_code].click_count++;
             rabbitmq_queue.push_back(log_event);
             click_analytics_logs.push_back(log_event);
-            db_mutex.unlock();
         }
 
         crow_light::Response res(302, "");
@@ -180,9 +177,8 @@ int main() {
     app.get("/api/analytics/<string>", [](const crow_light::Request& req) {
         std::string short_code = req.path.substr(15);
         
-        db_mutex.lock();
+        ScopedLock lock(db_mutex);
         if (!url_by_code.count(short_code)) {
-            db_mutex.unlock();
             return crow_light::Response(404, R"({"error":"Short code not found"})");
         }
 
@@ -205,14 +201,13 @@ int main() {
             }
         }
         res_json += "]}";
-        db_mutex.unlock();
 
         return crow_light::Response(200, res_json);
     });
 
     // 7. Get All User URLs Endpoint
     app.get("/api/user/urls", [](const crow_light::Request& req) {
-        db_mutex.lock();
+        ScopedLock lock(db_mutex);
         
         std::string res_json = R"({"urls":[)";
         bool first = true;
@@ -228,7 +223,6 @@ int main() {
             first = false;
         }
         res_json += R"(],"total_urls":)" + std::to_string(url_by_code.size()) + "}";
-        db_mutex.unlock();
 
         return crow_light::Response(200, res_json);
     });

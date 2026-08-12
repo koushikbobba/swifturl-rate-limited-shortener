@@ -9,24 +9,37 @@
 
 #ifdef _WIN32
   #include <windows.h>
-  class SimpleMutex {
+  class CrossPlatformMutex {
       CRITICAL_SECTION cs;
   public:
-      SimpleMutex() { InitializeCriticalSection(&cs); }
-      ~SimpleMutex() { DeleteCriticalSection(&cs); }
+      CrossPlatformMutex() { InitializeCriticalSection(&cs); }
+      ~CrossPlatformMutex() { DeleteCriticalSection(&cs); }
       void lock() { EnterCriticalSection(&cs); }
       void unlock() { LeaveCriticalSection(&cs); }
   };
 #else
   #include <mutex>
-  using SimpleMutex = std::mutex;
+  class CrossPlatformMutex {
+      std::mutex m;
+  public:
+      void lock() { m.lock(); }
+      void unlock() { m.unlock(); }
+  };
 #endif
+
+class ScopedLock {
+private:
+    CrossPlatformMutex& m_;
+public:
+    ScopedLock(CrossPlatformMutex& m) : m_(m) { m_.lock(); }
+    ~ScopedLock() { m_.unlock(); }
+};
 
 class SlidingWindowRateLimiter {
 private:
     int max_requests_;
     int window_seconds_;
-    SimpleMutex mutex_;
+    CrossPlatformMutex mutex_;
     std::unordered_map<std::string, std::deque<int64_t>> request_history_;
 
 public:
@@ -34,7 +47,7 @@ public:
         : max_requests_(max_requests), window_seconds_(window_seconds) {}
 
     bool is_allowed(const std::string& client_key) {
-        mutex_.lock();
+        ScopedLock lock(mutex_);
         
         auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()
@@ -50,16 +63,14 @@ public:
 
         if (timestamps.size() < static_cast<size_t>(max_requests_)) {
             timestamps.push_back(now_ms);
-            mutex_.unlock();
             return true;
         }
 
-        mutex_.unlock();
         return false;
     }
 
     int get_remaining(const std::string& client_key) {
-        mutex_.lock();
+        ScopedLock lock(mutex_);
         auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()
         ).count();
@@ -70,9 +81,7 @@ public:
             timestamps.pop_front();
         }
 
-        int remaining = std::max(0, max_requests_ - static_cast<int>(timestamps.size()));
-        mutex_.unlock();
-        return remaining;
+        return std::max(0, max_requests_ - static_cast<int>(timestamps.size()));
     }
 };
 
