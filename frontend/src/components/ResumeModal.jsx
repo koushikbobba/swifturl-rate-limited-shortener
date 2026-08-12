@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Database, Activity, CheckCircle2, ShieldCheck, Server, Zap, Github, Layers } from 'lucide-react';
+import { X, Cpu, Database, Activity, CheckCircle2, ShieldCheck, Server, Zap, Layers } from 'lucide-react';
 
 export default function ResumeModal({ isOpen, onClose }) {
   if (!isOpen) return null;
