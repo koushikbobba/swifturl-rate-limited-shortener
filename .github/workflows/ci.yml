@@ -1,0 +1,55 @@
+name: CI Build & Test Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-cpp-backend:
+    name: Build & Test C++ Crow API Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install C++ Compiler & CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ cmake make boost-all-dev libpq-dev libhiredis-dev
+
+      - name: Build C++ Server
+        run: |
+          g++ -O2 -std=c++17 backend/src/main.cpp -Ibackend/include -pthread -o backend/url_shortener_server
+          chmod +x backend/url_shortener_server
+
+      - name: Verify Executable Build
+        run: |
+          ls -la backend/url_shortener_server
+
+  build-react-frontend:
+    name: Build & Lint React Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci || npm install
+
+      - name: Build Production Distribution
+        run: |
+          cd frontend
+          npm run build

@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL - System of Record
+  postgres:
+    image: postgres:15-alpine
+    container_name: shortener_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: shortener_user
+      POSTGRES_PASSWORD: shortener_pass
+      POSTGRES_DB: shortener_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortener_user -d shortener_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis - Caching & Sliding Window Rate Limiting
+  redis:
+    image: redis:7-alpine
+    container_name: shortener_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. RabbitMQ - Asynchronous Click Event Queue
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: shortener_rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Web Management Dashboard port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 4. C++ Crow Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: shortener_cpp_backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://shortener_user:shortener_pass@postgres:5432/shortener_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # 5. Async Analytics Consumer Service
+  consumer:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
+    container_name: shortener_consumer
+    restart: always
+    environment:
+      - DATABASE_URL=postgres://shortener_user:shortener_pass@postgres:5432/shortener_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # 6. React Frontend (Vite + Glassmorphism Dashboard)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: shortener_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
