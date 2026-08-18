@@ -40,6 +40,7 @@ router.post('/shorten', authMiddleware, rateLimiter, async (req, res) => {
       cache.set(`url:${shortCode}`, original_url);
       
       const urlRecord = await db.get('SELECT * FROM urls WHERE id = ?', [nextId]);
+      urlRecord.short_url = `http://localhost:8080/r/${shortCode}`;
       return res.status(201).json(urlRecord);
     }
     
@@ -52,6 +53,7 @@ router.post('/shorten', authMiddleware, rateLimiter, async (req, res) => {
     cache.set(`url:${shortCode}`, original_url);
     
     const urlRecord = await db.get('SELECT * FROM urls WHERE id = ?', [result.lastID]);
+    urlRecord.short_url = `http://localhost:8080/r/${shortCode}`;
     res.status(201).json(urlRecord);
   } catch (err) {
     console.error('Error in /shorten:', err);

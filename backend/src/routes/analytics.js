@@ -8,10 +8,14 @@ router.get('/urls', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   try {
     const db = await getDb();
-    const result = await db.all(
+    const rows = await db.all(
       'SELECT short_code, original_url, click_count, created_at FROM urls WHERE user_id = ? ORDER BY created_at DESC',
       [userId]
     );
+    const result = rows.map(r => ({
+      ...r,
+      short_url: `http://localhost:8080/r/${r.short_code}`
+    }));
     res.json(result);
   } catch (err) {
     console.error('Error fetching URLs:', err);

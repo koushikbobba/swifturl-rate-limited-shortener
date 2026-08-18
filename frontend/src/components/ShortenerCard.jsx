@@ -53,10 +53,13 @@ export default function ShortenerCard({ onUrlCreated, rateLimitRemaining }) {
 
   const handleCopy = () => {
     if (!createdUrl) return;
-    navigator.clipboard.writeText(createdUrl.short_url);
+    const urlToCopy = createdUrl.short_url || `http://localhost:8080/r/${createdUrl.short_code}`;
+    navigator.clipboard.writeText(urlToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const shortUrlDisplay = createdUrl ? (createdUrl.short_url || `http://localhost:8080/r/${createdUrl.short_code}`) : '';
 
   return (
     <div className="glass-panel" style={{ padding: '32px', marginBottom: '32px' }}>
@@ -163,12 +166,12 @@ export default function ShortenerCard({ onUrlCreated, rateLimitRemaining }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <a
-                href={createdUrl.short_url}
+                href={shortUrlDisplay}
                 target="_blank"
                 rel="noreferrer"
                 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', textDecoration: 'none' }}
               >
-                {createdUrl.short_url}
+                {shortUrlDisplay}
               </a>
               <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px', maxWidth: '500px', wordBreak: 'break-all' }}>
                 Redirects to: {createdUrl.original_url}
