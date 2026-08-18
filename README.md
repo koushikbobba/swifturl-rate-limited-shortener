@@ -2,9 +2,6 @@
 
 A high-performance URL shortener microservices system built with a **Node.js/Express Backend API**, **React Frontend**, **PostgreSQL**, **Redis**, **RabbitMQ**, **JWT Auth**, and **Docker Compose**. (Recently migrated to the PERN stack!)
 
-![Dashboard Screenshot](screenshots/dashboard.png)
-![Analytics Screenshot](screenshots/analytics.png)
-
 ---
 
 ## 🌟 Architecture & Key Highlights
