@@ -1,9 +1,9 @@
 const express = require('express');
-const db = require('../db');
+const { getDb } = require('../db');
 const { encode } = require('../utils/base62');
 const { authMiddleware } = require('../middleware/authMiddleware');
 const rateLimiter = require('../middleware/rateLimiter');
-const { redisClient } = require('../redis');
+const cache = require('../redis'); // which is now an in-memory map
 
 const router = express.Router();
 
@@ -16,48 +16,42 @@ router.post('/shorten', authMiddleware, rateLimiter, async (req, res) => {
   }
 
   try {
+    const db = await getDb();
     let shortCode = custom_slug;
 
     if (custom_slug) {
-      // Check if custom slug already exists
-      const check = await db.query('SELECT id FROM urls WHERE short_code = $1', [custom_slug]);
-      if (check.rows.length > 0) {
+      const check = await db.get('SELECT id FROM urls WHERE short_code = ?', [custom_slug]);
+      if (check) {
         return res.status(409).json({ error: 'Custom slug already in use' });
       }
     } else {
-      // Generate a new code by inserting a dummy row to get an ID sequence, 
-      // or use a dedicated sequence if we had one.
-      // For simplicity matching the C++ version, we get the nextval of a sequence or max ID.
-      // Wait, let's use the sequence of the id column (SERIAL).
-      const nextIdResult = await db.query("SELECT nextval('urls_id_seq')");
-      const nextId = nextIdResult.rows[0].nextval;
-      shortCode = encode(nextId);
-      
-      // Since we just burned the sequence value, we will use it for the insert.
-      const result = await db.query(
-        'INSERT INTO urls (id, user_id, short_code, original_url) VALUES ($1, $2, $3, $4) RETURNING *',
-        [nextId, userId, shortCode, original_url]
+      // In SQLite, we can insert a dummy row to get lastID, or just calculate it
+      // Let's insert the row first with a temporary dummy short_code, then update it
+      const result = await db.run(
+        'INSERT INTO urls (user_id, short_code, original_url) VALUES (?, ?, ?)',
+        [userId, `temp_${Date.now()}_${Math.random()}`, original_url]
       );
       
-      const urlRecord = result.rows[0];
+      const nextId = result.lastID;
+      shortCode = encode(nextId);
       
-      // Cache in Redis
-      await redisClient.set(`url:${shortCode}`, original_url);
+      await db.run('UPDATE urls SET short_code = ? WHERE id = ?', [shortCode, nextId]);
       
+      cache.set(`url:${shortCode}`, original_url);
+      
+      const urlRecord = await db.get('SELECT * FROM urls WHERE id = ?', [nextId]);
       return res.status(201).json(urlRecord);
     }
     
     // If custom slug
-    const result = await db.query(
-      'INSERT INTO urls (user_id, short_code, original_url, custom_slug) VALUES ($1, $2, $3, $4) RETURNING *',
+    const result = await db.run(
+      'INSERT INTO urls (user_id, short_code, original_url, custom_slug) VALUES (?, ?, ?, ?)',
       [userId, shortCode, original_url, custom_slug]
     );
 
-    const urlRecord = result.rows[0];
+    cache.set(`url:${shortCode}`, original_url);
     
-    // Cache in Redis
-    await redisClient.set(`url:${shortCode}`, original_url);
-    
+    const urlRecord = await db.get('SELECT * FROM urls WHERE id = ?', [result.lastID]);
     res.status(201).json(urlRecord);
   } catch (err) {
     console.error('Error in /shorten:', err);

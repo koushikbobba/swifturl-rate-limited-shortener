@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SwiftURL - PERN Stack Complete Pipeline & Interview Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+  @page { size: A4; margin: 14mm; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; line-height: 1.6; background: #fff; font-size: 12px; }
+
+  h1 { font-size: 20px; font-weight: 900; color: #0284c7; border-bottom: 3px solid #0284c7; padding-bottom: 6px; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #475569; font-weight: 700; margin-bottom: 18px; }
+  h2 { font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 20px; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+  h3 { font-size: 13.5px; font-weight: 700; color: #0369a1; margin-top: 14px; margin-bottom: 5px; }
+
+  pre { font-family: 'JetBrains Mono', monospace; background: #0f172a; color: #38bdf8; padding: 12px 14px; font-size: 10.5px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; line-height: 1.4; margin: 10px 0; }
+  code { font-family: 'JetBrains Mono', monospace; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+
+  .tech-block { background: #f8fafc; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 10px 14px; margin: 10px 0; page-break-inside: avoid; }
+  .tech-name { font-weight: 800; color: #0284c7; font-size: 13px; margin-bottom: 4px; }
+
+  .q-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 13px; margin-bottom: 10px; page-break-inside: avoid; }
+  .q-title { font-weight: 800; color: #0f172a; font-size: 12.5px; margin-bottom: 3px; }
+  .q-answer { color: #334155; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11.5px; }
+  th, td { border: 1px solid #cbd5e1; padding: 7px 9px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+
+  .badge { display: inline-block; background: #0284c7; color: white; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+  .badge-green { background: #059669; }
+  .badge-purple { background: #7c3aed; }
+  .badge-orange { background: #ea580c; }
+  .badge-red { background: #dc2626; }
+</style>
+</head>
+<body>
+
+<h1>🚀 SwiftURL — The Complete Project Guide</h1>
+<div class="subtitle">Rate-Limited URL Shortener (PERN Stack) | Engineered by Koushik Bobba</div>
+
+<h2>1. WHAT IT DOES: The Core Concept</h2>
+<p>SwiftURL takes long, messy web links (e.g., <code>https://amazon.com/category/laptop/...</code>) and converts them into short, clean, 6-character links (e.g., <code>http://localhost:8080/r/q0V</code>). When a user clicks the short link, they are instantly redirected to the original long URL. Simultaneously, the system tracks analytics—recording the user's IP, browser (User-Agent), and timestamp—without slowing down the redirect experience.</p>
+
+<h2>2. HOW IT WORKS: The End-to-End Pipeline</h2>
+<pre>
+USER'S BROWSER (React UI)
+        │
+        ▼
+EXPRESS.JS BACKEND (Port 8080)
+        │
+        ├──► REDIS         ← Rate Limits requests + Caches URLs for O(1) instant lookups
+        │
+        ├──► POSTGRESQL    ← Permanently stores Users and URL mappings
+        │
+        └──► RABBITMQ      ← Receives click events instantly (Async queue)
+                │
+                ▼
+        NODE.JS CONSUMER WORKER
+                │
+                ▼
+        POSTGRESQL         ← Safely writes click data to the database in the background
+</pre>
+
+<h2>3. TECHNOLOGY STACK: What We Used & Why</h2>
+
+<div class="tech-block">
+  <div class="tech-name">Node.js & Express.js <span class="badge badge-green">Backend API</span></div>
+  <p><strong>What:</strong> Handles HTTP routing, JSON web tokens, and the core logic of the application.</p>
+  <p><strong>Why:</strong> The JavaScript ecosystem allows for rapid iteration and seamless code-sharing context with the React frontend. It provides excellent asynchronous I/O performance which is critical for handling high concurrent traffic.</p>
+</div>
+
+<div class="tech-block">
+  <div class="tech-name">PostgreSQL <span class="badge badge-purple">Primary Database</span></div>
+  <p><strong>What:</strong> A relational database storing `users`, `urls`, and `click_analytics`.</p>
+  <p><strong>Why:</strong> We need strict data integrity. If a user is deleted, all their URLs should be deleted (`ON DELETE CASCADE`). PostgreSQL's MVCC (Multi-Version Concurrency Control) ensures that heavy writes (analytics) don't lock out heavy reads (redirects).</p>
+</div>
+
+<div class="tech-block">
+  <div class="tech-name">Redis <span class="badge badge-red">Caching & Rate Limiting</span></div>
+  <p><strong>What:</strong> An in-memory data structure store.</p>
+  <p><strong>Why Cache:</strong> Database queries take ~10ms. Redis fetches from RAM in ~0.1ms. Popular short links are cached so PostgreSQL is never touched for a redirect (Cache-Aside pattern).</p>
+  <p><strong>Why Rate Limiter:</strong> We use Redis Sorted Sets (`ZSET`) to build a Sliding-Window Rate Limiter. It tracks exactly how many requests an IP made in the last 60 seconds and blocks them if they exceed 10 requests, protecting us from DDoS attacks.</p>
+</div>
+
+<div class="tech-block">
+  <div class="tech-name">RabbitMQ <span class="badge badge-orange">Message Queue</span></div>
+  <p><strong>What:</strong> A robust message broker for asynchronous communication.</p>
+  <p><strong>Why:</strong> When a user clicks a link, writing analytics to PostgreSQL takes 20-50ms. If 1,000 users click at once, the database would freeze. Instead, the Express API sends a 302 redirect instantly (&lt;2ms) and tosses a tiny message to RabbitMQ ("Someone clicked this!"). A separate worker reads this queue and writes to PostgreSQL at a safe pace.</p>
+</div>
+
+<div class="tech-block">
+  <div class="tech-name">React + Vite <span class="badge badge-purple">Frontend</span></div>
+  <p><strong>What:</strong> The user-facing dashboard.</p>
+  <p><strong>Why:</strong> We built a Single Page Application (SPA) with dynamic rendering. It uses `Recharts` for interactive SVG graphs, `lucide-react` for crisp icons, and custom CSS for a beautiful "Glassmorphic" (frosted glass) design. Vite is used over Webpack because its native ESM module loading is 10x faster for development.</p>
+</div>
+
+<h2>4. KEY ENGINEERING ALGORITHMS</h2>
+<p><strong>Base62 Encoding for URL Generation:</strong></p>
+<p>Instead of generating random short codes (which can cause collisions/duplicates), we use a PostgreSQL Sequence `nextval()` to get an atomic incrementing number (1, 2, 3...). We then convert that number into Base62 (0-9, a-z, A-Z). Since every number is unique, every short code is mathematically guaranteed to be unique. Zero collisions!</p>
+
+<h2>5. ISSUES FACED & HOW WE SOLVED THEM</h2>
+
+<div class="q-card">
+  <div class="q-title">Issue 1: The Docker Daemon Connection Failure</div>
+  <div class="q-answer"><strong>Problem:</strong> When trying to run `docker compose build`, the system threw an error: `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`.<br><strong>Solution:</strong> This occurred because the Docker Desktop GUI/Engine wasn't actively running on Windows. The fix was manual intervention: starting the Docker Desktop application from the Windows Start menu to initialize the daemon before running CLI commands.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Issue 2: GitHub Actions CI Node.js Version Mismatch</div>
+  <div class="q-answer"><strong>Problem:</strong> Our initial CI pipeline failed to build the React frontend. The runner defaulted to Node 18, but Vite 8 requires Node &gt;= 20.19.0 or 22.12.0.<br><strong>Solution:</strong> We updated the `.github/workflows/ci.yml` file to explicitly configure `actions/setup-node@v3` with `node-version: 22`.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Issue 3: C++ to PERN Architecture Migration</div>
+  <div class="q-answer"><strong>Problem:</strong> The project originally utilized a C++ backend. However, it was harder to maintain and test, and integrating standard web libraries was complex.<br><strong>Solution:</strong> We migrated the entire backend architecture to the PERN stack (PostgreSQL, Express, React, Node). We ripped out the C++ core and replaced it with Node.js/Express, while successfully reusing the <em>exact same</em> PostgreSQL database schema and RabbitMQ worker without needing to alter them.</div>
+</div>
+
+<h2>6. TOP INTERVIEW QUESTIONS & ANSWERS</h2>
+
+<div class="q-card">
+  <div class="q-title">Q1: How did you implement Rate Limiting and why that method?</div>
+  <div class="q-answer">I used the <strong>Sliding Window Log</strong> algorithm via Redis Sorted Sets (`ZSET`). For every request, we log the timestamp as both the score and value. We then use `ZREMRANGEBYSCORE` to drop requests older than 60 seconds, and `ZCARD` to count remaining requests. This is superior to Fixed Window (which allows double-bursts at the minute boundary) because it provides true rolling-window precision.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q2: Why use RabbitMQ? Why not just write to the database directly?</div>
+  <div class="q-answer">In a URL shortener, the read-to-write ratio is heavily skewed (thousands of redirects for every 1 URL created). If a link goes viral, hitting the database synchronously for every click would cause a connection pool bottleneck and crash the server. RabbitMQ decouples the process: the server returns a 302 redirect in under 2ms, drops a message in the queue, and the background worker updates the database when it has capacity.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q3: How do you guarantee a short code is unique without querying the database every time?</div>
+  <div class="q-answer">By using Base62 encoding on a monotonically increasing counter (PostgreSQL sequence). Random strings suffer from the Birthday Paradox, requiring expensive collision checks. A counter ensures that ID 1 becomes '1', ID 2 becomes '2', ID 100000 becomes 'q0V'. Every input is unique, so every output is unique by definition.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q4: What is Cache-Aside and how did you use it?</div>
+  <div class="q-answer">Cache-Aside is a caching strategy where the application checks the cache first. If there's a "hit", it returns the data immediately. If there's a "miss", the app queries the primary database, stores the result in the cache, and then returns it. In this project, Redis caches the `short_code -> original_url` mapping, ensuring 99% of redirects never touch PostgreSQL.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q5: Explain how you secured the application.</div>
+  <div class="q-answer">1. Passwords are hashed using `bcrypt` with a salt round of 10. <br>2. Authentication is stateless using JSON Web Tokens (JWT), preventing session hijacking. <br>3. Redis rate limiting protects the API from DDoS and brute-force attacks. <br>4. Prepared SQL statements via the `pg` library prevent SQL Injection attacks.</div>
+</div>
+
+</body>
+</html>

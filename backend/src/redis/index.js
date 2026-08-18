@@ -1,19 +1,15 @@
-const { createClient } = require('redis');
+// Simple in-memory cache to replace Redis
+const cacheMap = new Map();
 
-const redisClient = createClient({
-  url: `redis://${process.env.REDIS_HOST || 'redis'}:${process.env.REDIS_PORT || 6379}`
-});
+function set(key, value) {
+  cacheMap.set(key, value);
+}
 
-redisClient.on('error', (err) => console.error('Redis Client Error', err));
-
-async function connectRedis() {
-  if (!redisClient.isOpen) {
-    await redisClient.connect();
-    console.log('Connected to Redis');
-  }
+function get(key) {
+  return cacheMap.get(key);
 }
 
 module.exports = {
-  redisClient,
-  connectRedis
+  set,
+  get
 };

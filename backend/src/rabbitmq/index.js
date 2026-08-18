@@ -1,40 +1,36 @@
-const amqp = require('amqplib');
-
-let channel = null;
-
-async function connectRabbitMQ() {
-  const url = `amqp://${process.env.RABBITMQ_USER || 'guest'}:${process.env.RABBITMQ_PASSWORD || 'guest'}@${process.env.RABBITMQ_HOST || 'rabbitmq'}:${process.env.RABBITMQ_PORT || 5672}/`;
-  
-  try {
-    const connection = await amqp.connect(url);
-    channel = await connection.createChannel();
-    await channel.assertQueue('analytics_queue', { durable: true });
-    console.log('Connected to RabbitMQ and asserted analytics_queue');
-  } catch (error) {
-    console.error('Failed to connect to RabbitMQ:', error);
-    // In production, we'd implement a retry mechanism here
-  }
-}
+const { getDb } = require('../db');
 
 function publishClickEvent(shortCode, ipAddress, userAgent, referrer) {
-  if (!channel) {
-    console.error('RabbitMQ channel not established, dropping analytics event');
-    return;
-  }
+  // Instead of RabbitMQ, we just run the DB write asynchronously
+  // using setTimeout to prevent blocking the HTTP redirect response.
+  setTimeout(async () => {
+    try {
+      const db = await getDb();
+      
+      const ip = ipAddress || '0.0.0.0';
+      const agent = userAgent || 'Unknown';
+      const ref = referrer || '';
 
-  const event = {
-    short_code: shortCode,
-    ip_address: ipAddress || '0.0.0.0',
-    user_agent: userAgent || 'Unknown',
-    referrer: referrer || '',
-    timestamp: new Date().toISOString()
-  };
+      await db.run(
+        'INSERT INTO click_analytics (short_code, ip_address, user_agent, referrer) VALUES (?, ?, ?, ?)',
+        [shortCode, ip, agent, ref]
+      );
 
-  channel.sendToQueue(
-    'analytics_queue',
-    Buffer.from(JSON.stringify(event)),
-    { persistent: true }
-  );
+      await db.run(
+        'UPDATE urls SET click_count = click_count + 1 WHERE short_code = ?',
+        [shortCode]
+      );
+      
+      // console.log(`[Fake RabbitMQ] Click logged for ${shortCode}`);
+    } catch (error) {
+      console.error('Failed to log click event:', error);
+    }
+  }, 0);
+}
+
+// Dummy connect function so index.js doesn't break
+async function connectRabbitMQ() {
+  console.log('Skipping RabbitMQ (Running in local Docker-less mode)');
 }
 
 module.exports = {

@@ -1,20 +1,58 @@
-const { Pool } = require('pg');
+const sqlite3 = require('sqlite3').verbose();
+const { open } = require('sqlite');
+const path = require('path');
 
-// Use environment variables, default to docker compose service names
-const pool = new Pool({
-  host: process.env.DB_HOST || 'postgres',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password123',
-  database: process.env.DB_NAME || 'swifturl',
-});
+let dbInstance = null;
 
-pool.on('error', (err, client) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
+async function getDb() {
+  if (dbInstance) return dbInstance;
+
+  dbInstance = await open({
+    filename: path.join(__dirname, 'database.sqlite'),
+    driver: sqlite3.Database
+  });
+
+  await initDb();
+  return dbInstance;
+}
+
+async function initDb() {
+  await dbInstance.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS urls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      short_code TEXT UNIQUE NOT NULL,
+      original_url TEXT NOT NULL,
+      custom_slug TEXT UNIQUE,
+      click_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS click_analytics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      short_code TEXT NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      referrer TEXT,
+      clicked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_urls_short_code ON urls(short_code);
+    CREATE INDEX IF NOT EXISTS idx_urls_user_id ON urls(user_id);
+    CREATE INDEX IF NOT EXISTS idx_analytics_short_code ON click_analytics(short_code);
+  `);
+}
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool
+  getDb
 };

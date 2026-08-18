@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const db = require('../db');
+const { getDb } = require('../db');
 const { JWT_SECRET } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -17,14 +17,16 @@ router.post('/register', async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    const result = await db.query(
-      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email',
+    const db = await getDb();
+    
+    const result = await db.run(
+      'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
       [username, email, passwordHash]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ id: result.lastID, username, email });
   } catch (err) {
-    if (err.code === '23505') { // unique violation
+    if (err.message.includes('UNIQUE constraint failed')) {
       return res.status(409).json({ error: 'Username or email already exists' });
     }
     console.error('Error in /register:', err);
@@ -40,13 +42,13 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    const result = await db.query('SELECT id, username, password_hash FROM users WHERE username = $1', [username]);
+    const db = await getDb();
+    const user = await db.get('SELECT id, username, password_hash FROM users WHERE username = ?', [username]);
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const user = result.rows[0];
     const match = await bcrypt.compare(password, user.password_hash);
 
     if (!match) {

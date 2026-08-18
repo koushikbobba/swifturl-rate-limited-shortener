@@ -1,18 +1,20 @@
 # 🚀 Rate-Limited URL Shortener with Real-Time Analytics
 
-A high-performance URL shortener microservices system built with a **Node.js/Express Backend API**, **React Frontend**, **PostgreSQL**, **Redis**, **RabbitMQ**, **JWT Auth**, and **Docker Compose**. (Recently migrated to the PERN stack!)
+A zero-install URL shortener microservices system built with a **Node.js/Express Backend API**, **React Frontend**, and **SQLite**. 
+
+*(Note: This project was migrated from a Dockerized Postgres/Redis architecture to a purely local SQLite/In-Memory architecture for easier execution on Windows).*
 
 ---
 
 ## 🌟 Architecture & Key Highlights
 
-- **Node.js/Express Backend Engine**: High-performance REST API handling URL encoding, JWT authentication, and sliding-window rate protection.
+- **Node.js/Express Backend Engine**: High-performance REST API handling URL encoding and JWT authentication.
 - **Base62 Encoding**: Atomic sequence generator encoding long URLs into compact 6-character short codes (e.g. `q0V`).
-- **Redis Caching**: High-speed lookup cache avoiding database hits on popular redirect links.
-- **Sliding-Window Rate Limiter**: Redis-backed rolling counter using `ZSET` limiting requests per client IP (10 requests / 60s) to prevent abuse.
-- **RabbitMQ Async Queue**: Asynchronous message queue decoupling instant 302 redirects from database analytics writes.
-- **Analytics Worker**: Asynchronous consumer writing detailed click metrics (IP, User-Agent, Referrer, Timestamp) to PostgreSQL.
+- **In-Memory Caching**: High-speed lookup cache using JavaScript Maps avoiding database hits on popular redirect links.
+- **In-Memory Rate Limiter**: Rolling counter limiting requests per client IP (10 requests / 60s) to prevent abuse.
+- **Asynchronous Analytics**: Decoupled Node.js background tasks writing detailed click metrics (IP, User-Agent, Referrer, Timestamp) to SQLite without slowing down redirects.
 - **React UI Dashboard**: Modern dark glassmorphic UI featuring interactive Recharts click throughput graphs and rate limit indicators.
+- **Zero Configuration**: Uses a local SQLite `database.sqlite` file. No Docker, no PostgreSQL, no Redis required!
 
 ---
 
@@ -22,53 +24,47 @@ A high-performance URL shortener microservices system built with a **Node.js/Exp
 ├── backend/                # Node.js Express REST API Server
 │   ├── src/
 │   │   ├── utils/base62.js # Base62 encoder/decoder
-│   │   ├── middleware/     # Rate limiter & JWT auth
+│   │   ├── middleware/     # In-memory Rate limiter & JWT auth
 │   │   ├── routes/         # API routes
-│   │   ├── db/             # PostgreSQL connection
-│   │   ├── rabbitmq/       # RabbitMQ connection
-│   │   └── redis/          # Redis connection
+│   │   ├── db/             # SQLite connection & table creation
+│   │   ├── rabbitmq/       # Background async tasks (replacing queue)
+│   │   └── redis/          # In-memory Map cache (replacing Redis)
 │   ├── index.js            # Main Express server
-│   └── Dockerfile          # Node.js container build
+│   └── package.json        # Dependencies (sqlite3, express)
 ├── frontend/               # React + Vite Glassmorphic Dashboard
 │   ├── src/
 │   │   ├── components/     # Navbar, ShortenerCard, AnalyticsDashboard, AuthModal
 │   │   ├── index.css       # Glassmorphism design system
 │   │   └── App.jsx         # Main application layout
-│   └── Dockerfile          # Nginx container build
-├── consumer/               # Async RabbitMQ Click Analytics Worker
-│   ├── worker.js           # Queue listener & database persister
-│   └── Dockerfile          # Node.js worker build
-├── database/
-│   └── init.sql            # PostgreSQL schema & performance indexes
-└── docker-compose.yml      # Orchestrates all 6 microservices
+│   └── package.json        # Dependencies (vite, recharts)
+└── README.md               # You are here
 ```
 
 ---
 
-## 🛠️ How to Run
+## 🛠️ How to Run Locally
 
-### Option 1: Using Docker Compose (Single Command)
+You do **not** need Docker to run this project. You only need Node.js installed on your computer.
+
+### 1. Start the Backend API (Port 8080)
+Open a terminal and run:
 ```bash
-docker compose up --build
+cd backend
+npm install
+node index.js
 ```
-Access the application at:
-- **Frontend Dashboard**: `http://localhost:3000` (or `http://localhost:5173` locally)
-- **Node.js Backend API**: `http://localhost:8080`
-- **RabbitMQ Dashboard**: `http://localhost:15672` (User: `guest`, Pass: `guest`)
+*The database tables and `database.sqlite` file will automatically be created on the first run.*
 
-### Option 2: Running Locally
-1. **Run Node.js Backend**:
-   ```bash
-   cd backend
-   npm install
-   node index.js
-   ```
-2. **Run React Frontend**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+### 2. Start the React Frontend (Port 5173)
+Open a **second** terminal and run:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 3. Open the App
+Go to [http://localhost:5173](http://localhost:5173) in your browser!
 
 ---
 
