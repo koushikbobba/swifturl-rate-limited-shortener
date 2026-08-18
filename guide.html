@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SwiftURL - Complete Pipeline & Interview Guide - Koushik Bobba</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+  @page { size: A4; margin: 14mm; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; line-height: 1.65; background: #fff; font-size: 12.5px; }
+
+  h1 { font-size: 21px; font-weight: 900; color: #0284c7; border-bottom: 3px solid #0284c7; padding-bottom: 6px; margin-bottom: 2px; }
+  .subtitle { font-size: 13px; color: #475569; font-weight: 700; margin-bottom: 18px; }
+  h2 { font-size: 15.5px; font-weight: 800; color: #0f172a; margin-top: 22px; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+  h3 { font-size: 13.5px; font-weight: 700; color: #0369a1; margin-top: 14px; margin-bottom: 5px; }
+
+  pre { font-family: 'JetBrains Mono', monospace; background: #0f172a; color: #38bdf8; padding: 12px 14px; font-size: 10.5px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; line-height: 1.4; margin: 10px 0; }
+  code { font-family: 'JetBrains Mono', monospace; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+
+  .pipeline-step { display: flex; gap: 14px; margin-bottom: 14px; page-break-inside: avoid; }
+  .step-num { min-width: 32px; height: 32px; background: #0284c7; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; }
+  .step-content { flex: 1; }
+  .step-title { font-weight: 700; font-size: 13.5px; color: #0f172a; margin-bottom: 3px; }
+  .step-desc { color: #334155; font-size: 12px; }
+
+  .tech-block { background: #f8fafc; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 10px 14px; margin: 10px 0; page-break-inside: avoid; }
+  .tech-name { font-weight: 800; color: #0284c7; font-size: 13px; margin-bottom: 4px; }
+
+  .q-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 13px; margin-bottom: 10px; page-break-inside: avoid; }
+  .q-title { font-weight: 800; color: #0f172a; font-size: 12.5px; margin-bottom: 3px; }
+  .q-answer { color: #334155; font-size: 12px; }
+
+  .domain-header { background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; padding: 7px 13px; font-size: 14px; font-weight: 800; border-radius: 6px; margin-top: 20px; margin-bottom: 12px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11.5px; }
+  th, td { border: 1px solid #cbd5e1; padding: 7px 9px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+
+  .flow-arrow { text-align: center; font-size: 18px; color: #0284c7; margin: 4px 0; }
+  .highlight { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 14px; margin: 10px 0; }
+
+  .badge { display: inline-block; background: #0284c7; color: white; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+  .badge-green { background: #059669; }
+  .badge-purple { background: #7c3aed; }
+  .badge-orange { background: #ea580c; }
+</style>
+</head>
+<body>
+
+<h1>🚀 SwiftURL — Complete Pipeline, Technology Breakdown & Interview Preparation</h1>
+<div class="subtitle">Rate-Limited URL Shortener with Real-Time Analytics | Engineered by Koushik Bobba</div>
+
+<!-- ============================================================ -->
+<h2>PART 1 — THE COMPLETE SYSTEM PIPELINE (End to End)</h2>
+<!-- ============================================================ -->
+
+<pre>
+BROWSER (React UI @ :5173)
+        │
+        │  HTTP REST API Requests
+        ▼
+C++ CROW BACKEND (@ :8080)
+        │
+        ├──► REDIS         ← Rate Limit ZSET + URL Cache (in-memory, O(1))
+        │
+        ├──► POSTGRESQL    ← Permanent storage (users, urls, click_analytics)
+        │
+        └──► RABBITMQ      ← Click event queue (async, fire & forget)
+                │
+                ▼
+        ANALYTICS WORKER (Node.js consumer)
+                │
+                ▼
+        POSTGRESQL         ← Writes click logs + updates click count
+
+ALL 6 SERVICES RUN INSIDE DOCKER COMPOSE CONTAINERS
+GITHUB ACTIONS CI RUNS AUTOMATED BUILD TESTS ON EVERY GIT PUSH
+</pre>
+
+<!-- ============================================================ -->
+<h2>PART 2 — WHAT WE USED FOR WHAT (Technology Deep Dive)</h2>
+<!-- ============================================================ -->
+
+<!-- ---- REACT ---- -->
+<div class="tech-block">
+  <div class="tech-name">1. React + Vite <span class="badge badge-purple">Frontend</span></div>
+  <p><strong>What it does:</strong> Builds the visual dashboard that users interact with in a browser — the shortener form, analytics charts, link manager, rate limit status, login/register modals.</p>
+  <p><strong>Why React specifically?</strong></p>
+  <ul>
+    <li>Reactive state: when a new short link is created, the UI instantly updates without reloading the page.</li>
+    <li>Component-based: each part of the UI (ShortenerCard, AnalyticsDashboard, Navbar, AuthModal) is an isolated, reusable component.</li>
+    <li>Vite (build tool) uses native ES modules instead of Webpack → 10-100x faster dev server startup and Hot Module Replacement (HMR).</li>
+  </ul>
+  <p><strong>Why NOT Next.js?</strong> Next.js adds Server-Side Rendering (SSR) which creates unnecessary server complexity for a Single Page App dashboard. Why NOT Angular? Angular has a heavy boilerplate and steep learning curve for a project of this size.</p>
+  <p><strong>Libraries used inside React:</strong></p>
+  <ul>
+    <li><code>Recharts</code> → For interactive SVG analytics graphs (Area Charts, Line Charts)</li>
+    <li><code>lucide-react</code> → For clean icon pack (no bulky image imports)</li>
+    <li><code>CSS Glassmorphism</code> → Frosted glass visual effect via <code>backdrop-filter: blur(20px)</code></li>
+  </ul>
+</div>
+
+<!-- ---- C++ CROW ---- -->
+<div class="tech-block">
+  <div class="tech-name">2. C++17 (Crow HTTP Framework) <span class="badge">Backend API Engine</span></div>
+  <p><strong>What it does:</strong> The heart of the system. Listens for incoming HTTP requests on port 8080 and handles all business logic: authentication, rate limiting, URL shortening, redirections, analytics queries.</p>
+  <p><strong>Why C++ specifically?</strong></p>
+  <ul>
+    <li><strong>Zero Garbage Collection:</strong> Unlike Node.js/Python/Java, C++ never pauses execution for GC (Garbage Collector cleanup). This means no random latency spikes.</li>
+    <li><strong>Sub-millisecond performance:</strong> C++ processes HTTP requests in under 1ms, critical for a redirect service where every millisecond matters.</li>
+    <li><strong>Memory control:</strong> A C++ server uses ~15MB RAM per container. A Java Spring Boot server uses 500MB+ for the same job.</li>
+    <li><strong>Multithreading:</strong> Each incoming connection gets its own worker thread (using <code>std::thread</code> on Linux, <code>CreateThread</code> on Windows).</li>
+  </ul>
+  <p><strong>API Routes Built:</strong></p>
+  <table>
+    <tr><th>Method</th><th>Route</th><th>What it does</th></tr>
+    <tr><td>GET</td><td>/health</td><td>Liveness check — confirms server is alive</td></tr>
+    <tr><td>POST</td><td>/api/auth/register</td><td>Register new user, store hashed password in PostgreSQL</td></tr>
+    <tr><td>POST</td><td>/api/auth/login</td><td>Verify credentials, return signed JWT token</td></tr>
+    <tr><td>POST</td><td>/api/shorten</td><td>Create short URL (requires JWT), rate limited</td></tr>
+    <tr><td>GET</td><td>/r/{short_code}</td><td>HTTP 302 redirect to original URL, publish click to RabbitMQ</td></tr>
+    <tr><td>GET</td><td>/api/analytics/{code}</td><td>Return click history, user-agent breakdown, timestamps</td></tr>
+    <tr><td>GET</td><td>/api/user/urls</td><td>Return all short links created by the logged-in user</td></tr>
+  </table>
+</div>
+
+<!-- ---- REDIS ---- -->
+<div class="tech-block">
+  <div class="tech-name">3. Redis <span class="badge badge-orange">Cache + Rate Limiter</span></div>
+  <p><strong>What it does — TWO distinct roles:</strong></p>
+
+  <p><strong>Role A: URL Cache (L1 Cache)</strong></p>
+  <ul>
+    <li>When a short URL is created, its mapping (short_code → original_url) is stored in Redis immediately.</li>
+    <li>When someone clicks the link, the C++ server checks Redis FIRST before touching PostgreSQL.</li>
+    <li>Redis lookup = O(1), ~0.1ms. PostgreSQL query = O(log N), ~5-15ms.</li>
+    <li>Result: 99%+ cache hit ratio → Almost all redirects happen without ever touching the database.</li>
+  </ul>
+  <pre>
+  GET url:q0V → "https://amazon.in/very-long-product-url"  (Cache HIT, 0.1ms)
+  GET url:zzz → (nil)                                       (Cache MISS, fall through to PostgreSQL)
+  </pre>
+
+  <p><strong>Role B: Sliding-Window Rate Limiter</strong></p>
+  <ul>
+    <li>Uses Redis Sorted Sets (ZSET) to store a rolling log of request timestamps per client IP.</li>
+    <li>Every request: ADD current timestamp → REMOVE timestamps older than 60 seconds → COUNT remaining entries.</li>
+    <li>If count &gt; 10 → Reject with HTTP 429 Too Many Requests.</li>
+  </ul>
+  <pre>
+  ZADD ratelimit:192.168.1.1 1723566000000 1723566000000   # Add current timestamp
+  ZREMRANGEBYSCORE ratelimit:192.168.1.1 0 1723565940000   # Remove entries older than 60s
+  ZCARD ratelimit:192.168.1.1                              # Count = 11? BLOCK. Count = 5? ALLOW.
+  </pre>
+
+  <p><strong>Why NOT Memcached for caching?</strong> Memcached is a simple key-value store. Redis has Sorted Sets (ZSET), which are essential for the sliding-window rate limiter. Memcached cannot do this.</p>
+  <p><strong>Why NOT in-memory C++ HashMap?</strong> A C++ map lives inside ONE server process. If you scale to 3 backend servers, each has its own separate map — the rate limiter would be bypassed by sending requests to different servers. Redis is a shared external store accessible by all backend nodes.</p>
+</div>
+
+<!-- ---- RABBITMQ ---- -->
+<div class="tech-block">
+  <div class="tech-name">4. RabbitMQ <span class="badge badge-orange">Async Message Queue</span></div>
+  <p><strong>What it does:</strong> Acts as a middleman between the C++ backend and the analytics database writer. When someone clicks a short link, instead of the backend writing to PostgreSQL (slow), it drops a tiny message into RabbitMQ and immediately returns the 302 redirect to the user.</p>
+  <p><strong>The Problem It Solves:</strong></p>
+  <ul>
+    <li>Writing click data to PostgreSQL takes 15-50ms (disk I/O, table locking, index updates).</li>
+    <li>If 10,000 users click a viral link simultaneously, 10,000 synchronous DB writes = database crashes.</li>
+    <li>The user doesn't care about analytics — they just want to reach the destination fast.</li>
+  </ul>
+  <p><strong>The Solution:</strong></p>
+  <pre>
+  User clicks link
+        │
+        ▼
+  C++ Backend checks Redis cache → finds URL (0.1ms)
+        │
+        ├──► Sends HTTP 302 redirect to user  (&lt;2ms total — USER IS DONE)
+        │
+        └──► Drops JSON message to RabbitMQ:
+             {"short_code":"q0V","ip":"123.45.67.89","user_agent":"Chrome/115","timestamp":"..."}
+                      │
+                      ▼ (asynchronously, user doesn't wait)
+             Analytics Worker consumes message
+                      │
+                      ▼
+             INSERT INTO click_analytics ... (PostgreSQL)
+             UPDATE urls SET click_count = click_count + 1 ...
+  </pre>
+
+  <p><strong>Why NOT Kafka?</strong> Kafka is a distributed log system built for millions of events per second across multiple partitions. For a task queue of click events, it's like using a freight train to deliver a pizza. RabbitMQ is simpler, faster to set up, and provides per-message acknowledgements (critical for reliability).</p>
+  <p><strong>Why NOT direct PostgreSQL write?</strong> Answered above — latency and connection pool exhaustion under heavy load.</p>
+  <p><strong>Why NOT Redis Pub/Sub?</strong> Redis Pub/Sub is fire-and-forget. If the analytics worker is restarting when a click event arrives, the message is gone forever. RabbitMQ persists messages to disk (durable queues) and re-queues them if the worker crashes.</p>
+</div>
+
+<!-- ---- POSTGRESQL ---- -->
+<div class="tech-block">
+  <div class="tech-name">5. PostgreSQL 15 <span class="badge badge-green">Primary Database</span></div>
+  <p><strong>What it does:</strong> Permanent storage for everything — user accounts, URL mappings, and click history.</p>
+  <p><strong>Tables created:</strong></p>
+  <table>
+    <tr><th>Table</th><th>Columns</th><th>Purpose</th></tr>
+    <tr><td><code>users</code></td><td>id, username, email, password_hash, created_at</td><td>Stores registered user accounts</td></tr>
+    <tr><td><code>urls</code></td><td>id, user_id, short_code, original_url, custom_slug, click_count, created_at, expires_at</td><td>Stores every short URL created</td></tr>
+    <tr><td><code>click_analytics</code></td><td>id, short_code, ip_address, user_agent, referrer, clicked_at</td><td>Records every click event</td></tr>
+  </table>
+  <p><strong>Indexes created for performance:</strong></p>
+  <ul>
+    <li><code>CREATE UNIQUE INDEX idx_urls_short_code ON urls(short_code);</code> → Makes looking up a short code O(log N) fast instead of scanning the entire table</li>
+    <li><code>CREATE INDEX idx_urls_user_id ON urls(user_id);</code> → Fast retrieval of all links for a user's dashboard</li>
+    <li><code>CREATE INDEX idx_analytics_short_code ON click_analytics(short_code);</code> → Fast analytics aggregation per link</li>
+  </ul>
+  <p><strong>Why NOT MongoDB?</strong> MongoDB is a NoSQL document database. It has no strict foreign keys (so deleting a user could leave orphaned URL records). It also has no ACID transaction guarantees across collections — meaning data can become inconsistent. PostgreSQL gives us full referential integrity with <code>ON DELETE CASCADE</code>.</p>
+  <p><strong>Why NOT MySQL?</strong> PostgreSQL has better support for complex JSON queries, superior MVCC (Multi-Version Concurrency Control) for high concurrency, and better default performance for analytics-style aggregation queries.</p>
+</div>
+
+<!-- ---- BASE62 ---- -->
+<div class="tech-block">
+  <div class="tech-name">6. Base62 Short Code Algorithm <span class="badge">Core Algorithm</span></div>
+  <p><strong>What it does:</strong> Converts an incrementing number (1, 2, 3 ...) into a short, URL-safe alphanumeric string like <code>q0V</code>, <code>abc</code>, <code>Z7f</code>.</p>
+  <p><strong>The Math:</strong></p>
+  <pre>
+  Base62 alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                     (10 digits + 26 lowercase + 26 uppercase = 62 characters)
+
+  To encode number 100000:
+    100000 % 62 = 16  → alphabet[16] = 'g'
+    100000 / 62 = 1612
+    1612 % 62   = 0   → alphabet[0]  = '0'
+    1612 / 62   = 26
+    26 % 62     = 26  → alphabet[26] = 'q'
+    26 / 62     = 0   → STOP
+
+  Result (reversed): "q0g"   ← your short code!
+
+  6-character capacity: 62^6 = 56,800,235,584  (56.8 BILLION unique short URLs)
+  </pre>
+  <p><strong>Why NOT MD5/SHA256 hash?</strong> MD5 hashing a URL produces 32 characters. To get a 6-char code you truncate it — but then two different URLs might hash to the same 6 characters (collision). You'd need to do a database lookup every time to check for collisions. With our counter, each number is unique by definition — zero collision checks needed.</p>
+  <p><strong>Why NOT UUID?</strong> UUIDs are 36 characters — completely useless as a short URL code.</p>
+</div>
+
+<!-- ---- JWT ---- -->
+<div class="tech-block">
+  <div class="tech-name">7. JWT (JSON Web Tokens) <span class="badge badge-green">Authentication</span></div>
+  <p><strong>What it does:</strong> After you log in, the C++ server gives you a signed "token" (like a wristband at a concert). Every time you create a short link, you present this token. The server verifies it's genuine without touching the database.</p>
+  <pre>
+  Token structure:
+  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9    ← Header (base64 encoded algorithm info)
+  .eyJ1c2VySWQiOiIxMjMiLCJleHAiOiIuLi4ifQ  ← Payload (base64 encoded user data)
+  .XKr2LqPWRB5NvVd-3y8F4qNwjb7P8QkS2UhTCo  ← Signature (HMAC-SHA256 of header+payload)
+
+  Verification: Server re-computes HMAC-SHA256(header+payload, secret_key)
+  If it matches the signature → Token is valid (not tampered with) → Allow request
+  If it doesn't match → Token is fake or modified → Reject request (HTTP 401)
+  </pre>
+  <p><strong>Why JWT?</strong> It's stateless — no session table in the database needed. The token itself contains all info. Any backend server can verify it independently.</p>
+</div>
+
+<!-- ---- DOCKER ---- -->
+<div class="tech-block">
+  <div class="tech-name">8. Docker + Docker Compose <span class="badge badge-purple">Containerization & Orchestration</span></div>
+  <p><strong>What it does:</strong> Packages each service into an isolated container (like a self-contained box) and runs all 6 containers together with one command.</p>
+  <table>
+    <tr><th>Service</th><th>Container Image</th><th>Port</th><th>Role</th></tr>
+    <tr><td>postgres</td><td>postgres:15-alpine</td><td>5432</td><td>Primary database</td></tr>
+    <tr><td>redis</td><td>redis:7-alpine</td><td>6379</td><td>Cache + Rate Limiter</td></tr>
+    <tr><td>rabbitmq</td><td>rabbitmq:3-management</td><td>5672 / 15672</td><td>Message queue + Web UI</td></tr>
+    <tr><td>backend</td><td>Custom C++ multi-stage build</td><td>8080</td><td>C++ API engine</td></tr>
+    <tr><td>consumer</td><td>node:18-alpine</td><td>—</td><td>Analytics worker</td></tr>
+    <tr><td>frontend</td><td>node:18-alpine → nginx:alpine</td><td>5173</td><td>React UI server</td></tr>
+  </table>
+  <p><strong>Why Multi-Stage Docker Build for C++ Backend?</strong></p>
+  <ul>
+    <li>Stage 1 (builder): Uses alpine with GCC/CMake installed (~800MB image) to compile the C++ code into an executable binary.</li>
+    <li>Stage 2 (runtime): Copies ONLY the compiled binary into a fresh alpine image (~5MB) — no compiler, no source code, just the binary.</li>
+    <li>Result: Final container image is ~25MB instead of 800MB. Smaller = faster to deploy, less attack surface.</li>
+  </ul>
+</div>
+
+<!-- ---- GITHUB ACTIONS ---- -->
+<div class="tech-block">
+  <div class="tech-name">9. GitHub Actions CI/CD Pipeline <span class="badge badge-green">Automation</span></div>
+  <p><strong>What it does:</strong> Every time you <code>git push</code> code to GitHub, GitHub automatically spins up a virtual machine (Ubuntu Linux) and runs two test jobs:</p>
+  <ul>
+    <li><strong>Job 1 — Build & Test C++ Backend:</strong> Installs GCC on Ubuntu, compiles <code>backend/src/main.cpp</code> with <code>-std=c++17 -pthread</code>, verifies the binary is created successfully.</li>
+    <li><strong>Job 2 — Build React Frontend:</strong> Installs Node.js 22, runs <code>npm install</code> and <code>npm run build</code> in the frontend directory. If it builds without errors, CI passes.</li>
+  </ul>
+  <p><strong>Why Node.js 22 specifically?</strong> Vite 8 (our build tool) requires Node.js &gt;= 20.19.0 or &gt;= 22.12.0. GitHub's default runner was Node 18, causing our initial CI failures — so we explicitly set <code>node-version: 22</code> in the workflow file.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>PART 3 — INTERVIEW QUESTIONS BY DOMAIN</h2>
+<!-- ============================================================ -->
+
+<div class="domain-header">DOMAIN 1: PROJECT OVERVIEW & DESIGN DECISIONS</div>
+
+<div class="q-card">
+  <div class="q-title">Q1: Walk me through your project in 60 seconds.</div>
+  <div class="q-answer"><strong>Answer script:</strong> "I built SwiftURL — a rate-limited URL shortener with real-time analytics. The backend is a C++17 server using the Crow framework for sub-millisecond HTTP performance. Short codes are generated using Base62 encoding of an atomic counter, guaranteeing zero collisions across 56.8 billion URLs. Redis handles both URL caching (99%+ hit ratio) and sliding-window rate limiting using Sorted Sets. RabbitMQ decouples click tracking from HTTP redirects — users get their 302 in under 2ms while analytics are written asynchronously. PostgreSQL stores everything permanently. The whole system runs in Docker Compose with GitHub Actions CI."</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q2: Why did you choose C++ over Go or Node.js for the backend?</div>
+  <div class="q-answer">C++ has zero Garbage Collection pauses — no random latency spikes. A Go or Node.js GC can pause the process for 10-100ms. For a redirect service where milliseconds matter, C++ provides deterministic latency. Also, C++ demonstrates deeper systems programming skills — working with raw sockets, thread management, and memory directly.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q3: What problem does RabbitMQ solve here? Why not write directly to the database?</div>
+  <div class="q-answer">Writing to PostgreSQL takes 15-50ms. If 10,000 users hit a viral link simultaneously, 10,000 synchronous DB writes would exhaust the database connection pool and crash the system. RabbitMQ lets us return the HTTP 302 redirect in &lt;2ms, then write analytics in the background without blocking users.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q4: What happens if your system goes down — do you lose click data?</div>
+  <div class="q-answer">No. RabbitMQ uses durable queues (messages written to disk) and the worker uses manual ACKs. A message is only removed from the queue after PostgreSQL confirms the INSERT was committed. If the worker crashes mid-processing, RabbitMQ re-queues the message automatically when the worker restarts.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q5: How would you scale this to 1 million requests per second?</div>
+  <div class="q-answer">1. Put NGINX/AWS ALB in front of multiple C++ server instances. 2. Replace the single atomic counter with Twitter Snowflake IDs or ZooKeeper-assigned ID ranges per node to avoid counter conflicts. 3. Add PostgreSQL read replicas for URL lookups. 4. Use Redis Cluster (16,384 hash slots across nodes) instead of single Redis. 5. Add CDN edge caching for the most popular short codes at Cloudflare edge nodes globally.</div>
+</div>
+
+<div class="domain-header">DOMAIN 2: BASE62 & ALGORITHM QUESTIONS</div>
+
+<div class="q-card">
+  <div class="q-title">Q6: Why Base62 and not Base64?</div>
+  <div class="q-answer">Base64 includes '+', '/', and '=' characters. In URLs, '+' means space and '/' means path separator — both cause parsing issues. Base62 uses only [0-9a-zA-Z] — all alphanumeric, 100% URL-safe without any encoding needed.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q7: Why not use a random string generator for short codes?</div>
+  <div class="q-answer">Random strings have collision probability described by the Birthday Paradox: with N existing codes, each new code has approximately N/62^6 probability of collision. As the database grows, you'd need expensive SELECT queries to check for collisions before every INSERT. Our atomic counter is monotonically increasing — each code is unique by definition, zero collision checks needed.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q8: What is the maximum number of URLs your system can support?</div>
+  <div class="q-answer">With 6-character Base62 codes: 62^6 = 56,800,235,584 (56.8 billion). If we extend to 7 characters: 62^7 = 3.5 trillion. The counter is uint64_t (unsigned 64-bit integer), supporting up to 18.4 quintillion total URLs before overflow.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q9: How do you handle custom slugs without breaking the Base62 counter?</div>
+  <div class="q-answer">Custom slugs are stored in the database using the user-provided string as the short_code value. The UNIQUE index on short_code prevents duplicates. The atomic counter generates codes independently — it doesn't check custom slugs. If a counter-generated code ever collides with a custom slug, PostgreSQL's UNIQUE constraint rejects it and we just increment the counter.</div>
+</div>
+
+<div class="domain-header">DOMAIN 3: REDIS & CACHING</div>
+
+<div class="q-card">
+  <div class="q-title">Q10: What is the Cache-Aside pattern and how do you use it?</div>
+  <div class="q-answer">Cache-Aside (also called Lazy Loading): Application checks Redis first. On cache HIT → return from Redis. On cache MISS → query PostgreSQL → store result in Redis → return result. We also pre-warm the cache on URL creation (write-through) so the very first click is also a cache HIT.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q11: What is a cache stampede (Thundering Herd) and how do you prevent it?</div>
+  <div class="q-answer">If a viral link's Redis key expires, 50,000 concurrent users simultaneously miss the cache and all hit PostgreSQL. Solution: When a cache miss is detected, use a distributed lock (Redis SET NX command — "set if not exists") so only ONE thread queries PostgreSQL and repopulates Redis. Other threads wait briefly then get the cache hit.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q12: Why is Redis single-threaded actually an advantage for rate limiting?</div>
+  <div class="q-answer">Single-threaded execution means all Redis commands run sequentially without locks. ZADD + ZREMRANGEBYSCORE + ZCARD is effectively atomic — no other operation can interleave between these commands. This eliminates race conditions in our rate limiter without needing Lua scripts for simple use cases.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q13: What Redis data structure do you use for rate limiting and why?</div>
+  <div class="q-answer">Sorted Sets (ZSET). Each member is a timestamp (score = timestamp, member = timestamp). ZREMRANGEBYSCORE removes entries older than T-60s. ZCARD counts remaining entries. This gives us an exact rolling window log of request timestamps, enabling true sliding-window rate limiting.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q14: What is the difference between Redis RDB and AOF persistence?</div>
+  <div class="q-answer">RDB: Creates point-in-time snapshot files periodically (e.g., every 15 minutes). Fast restore but can lose up to 15 minutes of data if Redis crashes. AOF: Appends every write command to a log file (can sync every second). Slower but up to 1 second of data loss at most. For production, use AOF with everysec sync for a balance of durability and performance.</div>
+</div>
+
+<div class="domain-header">DOMAIN 4: RATE LIMITING DEEP DIVE</div>
+
+<div class="q-card">
+  <div class="q-title">Q15: Compare Fixed Window, Sliding Window, Token Bucket, and Leaky Bucket rate limiters.</div>
+  <div class="q-answer">
+    <strong>Fixed Window:</strong> Allow 10 req per minute window (e.g., 12:00-12:01). Problem: client sends 10 at 12:00:59 and 10 at 12:01:01 = 20 requests in 2 seconds. Boundary burst vulnerability.<br>
+    <strong>Sliding Window Log (what we use):</strong> Track exact timestamps of each request in a rolling window. No boundary bursts. Memory cost: O(N) per client.<br>
+    <strong>Token Bucket:</strong> Tokens refill at a constant rate. Allows controlled bursts (spend saved tokens). More complex to implement in Redis.<br>
+    <strong>Leaky Bucket:</strong> Requests enter a queue and exit at a constant rate regardless of burst. Smooths traffic artificially — legitimate burst traffic is delayed unnecessarily.
+  </div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q16: What HTTP status code do you return for rate limit violation and what headers?</div>
+  <div class="q-answer">HTTP 429 Too Many Requests. Headers: X-RateLimit-Limit: 10, X-RateLimit-Remaining: 0, X-RateLimit-Reset: [unix timestamp of window reset], Retry-After: 60 (seconds to wait).</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q17: How do you handle rate limiting in a distributed system with multiple servers?</div>
+  <div class="q-answer">Each server cannot have its own in-memory rate limit counter because clients can route to different servers. The rate limiter MUST use a centralized shared store (Redis) that all server instances can access. Redis's single-threaded atomic operations ensure the counter is consistent even under concurrent updates from multiple servers.</div>
+</div>
+
+<div class="domain-header">DOMAIN 5: RABBITMQ & ASYNC MESSAGING</div>
+
+<div class="q-card">
+  <div class="q-title">Q18: Explain AMQP — Producer, Exchange, Queue, Consumer, Binding.</div>
+  <div class="q-answer">Producer (C++ backend) publishes a message to an Exchange. The Exchange routes the message to one or more Queues based on Binding rules (routing keys). Consumer (analytics worker) subscribes to a Queue and processes messages. In our system: Exchange type = Direct, routing key = "analytics_queue", one Queue, one Consumer.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q19: What is message acknowledgement (ACK) and why is it critical?</div>
+  <div class="q-answer">When a consumer receives a message, RabbitMQ holds it until the consumer sends an ACK. If the consumer crashes before ACKing, RabbitMQ re-queues the message for another consumer. In our system, we ACK only AFTER successfully inserting into PostgreSQL. This guarantees at-least-once delivery — no click event is ever silently dropped.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q20: What is a Dead Letter Queue (DLQ) and when would you use it?</div>
+  <div class="q-answer">A DLQ is a special queue where RabbitMQ routes messages that: (1) are rejected (NACK'd) by a consumer, (2) have exceeded their retry limit, or (3) have expired their TTL. In production, you'd monitor the DLQ for failed analytics events that need manual investigation.</div>
+</div>
+
+<div class="domain-header">DOMAIN 6: POSTGRESQL & DATABASE DESIGN</div>
+
+<div class="q-card">
+  <div class="q-title">Q21: Why did you create a UNIQUE INDEX on short_code instead of just a PRIMARY KEY?</div>
+  <div class="q-answer">The primary key on the urls table is an integer ID (auto-increment). The short_code is a separate business identifier. We need the short_code to be unique (no two URLs share the same code) but it's not the row's identity. The UNIQUE INDEX enforces uniqueness AND creates a B-Tree data structure for O(log N) lookups by short_code, which is the most common query.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q22: What is MVCC in PostgreSQL and why does it matter for concurrent reads and writes?</div>
+  <div class="q-answer">MVCC (Multi-Version Concurrency Control): PostgreSQL keeps multiple versions of each row. When a writer updates a row, it creates a new version without deleting the old one. Readers reading at the same time see the old version — no blocking. After the transaction commits, new readers see the new version. This eliminates read-write lock contention — critical for our high read (redirects) to write (click counts) ratio.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q23: What is an N+1 query problem and does your system have it?</div>
+  <div class="q-answer">N+1 problem: Fetching a list of N items, then making 1 additional query per item = N+1 total queries. In our analytics dashboard, we fetch all URLs for a user (1 query), then could mistakenly fetch click counts for each URL separately (N queries). We avoid this by using SQL JOINs or aggregate sub-queries to fetch all data in a single query.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q24: Why BIGINT for click_count instead of INT?</div>
+  <div class="q-answer">INT (32-bit signed integer) maxes out at 2,147,483,647 (~2.1 billion). A very popular short URL from a viral post or large company could exceed 2 billion clicks over its lifetime. BIGINT (64-bit signed integer) supports up to 9,223,372,036,854,775,807 — essentially unlimited for click counting.</div>
+</div>
+
+<div class="domain-header">DOMAIN 7: NETWORKING & HTTP PROTOCOL</div>
+
+<div class="q-card">
+  <div class="q-title">Q25: Why HTTP 302 instead of HTTP 301 for redirects?</div>
+  <div class="q-answer">HTTP 301 (Permanent Redirect): Browsers cache it forever. After the first visit, the browser goes directly to the destination without hitting our server — click analytics become impossible. HTTP 302 (Temporary Redirect): Browsers never cache it. Every click goes through our server — we track every single click event. For analytics, 302 is mandatory.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q26: What is CORS and why do you need it?</div>
+  <div class="q-answer">CORS (Cross-Origin Resource Sharing): Browsers block JavaScript from making requests to a different domain/port than the page was loaded from. Our React frontend is on port 5173; our C++ API is on port 8080. Without CORS headers on the backend (Access-Control-Allow-Origin: *), the browser blocks all API calls. We also handle OPTIONS preflight requests — the browser's "permission check" before sending actual POST/PUT requests.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q27: Explain TCP handshake and how it relates to API latency.</div>
+  <div class="q-answer">TCP requires a 3-way handshake before data transfer: SYN → SYN-ACK → ACK. This takes 1 round-trip time (RTT). For local requests: ~0.1ms. For cross-continental requests: ~150ms. HTTP Keep-Alive reuses the same TCP connection for multiple requests, avoiding repeated handshakes — critical for the React frontend's multiple API calls during page load.</div>
+</div>
+
+<div class="domain-header">DOMAIN 8: DOCKER & DEVOPS</div>
+
+<div class="q-card">
+  <div class="q-title">Q28: What is a multi-stage Docker build and why is it important?</div>
+  <div class="q-answer">Stage 1 (Build stage): Uses a large image with GCC compiler, CMake, and all build tools (~800MB) to compile the C++ code. Stage 2 (Runtime stage): Starts from a tiny Alpine Linux image (~5MB) and copies ONLY the compiled binary from Stage 1. Result: Production container is ~25MB instead of 800MB. Smaller images deploy faster, use less bandwidth, and have smaller attack surfaces.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q29: How does Docker Compose handle service startup ordering?</div>
+  <div class="q-answer">Using depends_on with health checks. Example: backend container has depends_on: postgres: condition: service_healthy. Docker Compose runs a health check command (pg_isready) on the postgres container. The backend only starts after postgres reports healthy. Without this, the backend might start and immediately crash because PostgreSQL isn't ready to accept connections yet.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q30: What is the difference between a Docker Image and a Container?</div>
+  <div class="q-answer">A Docker Image is a read-only template — like a class definition. A Container is a running instance of an image — like an object created from a class. You can run 10 containers from the same image simultaneously. Images are built with docker build; containers are started with docker run or docker compose up.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q31: Why did your GitHub Actions CI initially fail and how did you fix it?</div>
+  <div class="q-answer">Initial failures: (1) Missing npm install step for the frontend build. (2) GitHub runner had Node.js 18, but Vite 8 requires Node.js 20.19+ or 22.12+. (3) C++ compilation had Windows-specific threading code that didn't compile on Linux runners. Fixed by: adding npm install to CI, pinning node-version: 22 in the workflow, and implementing cross-platform threading with #ifdef _WIN32 preprocessor guards.</div>
+</div>
+
+<div class="domain-header">DOMAIN 9: SECURITY</div>
+
+<div class="q-card">
+  <div class="q-title">Q32: How does JWT authentication work and what are its weaknesses?</div>
+  <div class="q-answer">JWT = Header.Payload.Signature. Server signs the payload with HMAC-SHA256 and a secret key. Any modification to the payload invalidates the signature. Stateless — no database lookup needed per request. Weaknesses: (1) Cannot invalidate individual tokens before expiry (need a Redis blacklist). (2) If the secret key leaks, all tokens are compromised. (3) Payload is base64-encoded (not encrypted) — don't store sensitive data in it.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q33: What is SQL injection and how do you prevent it?</div>
+  <div class="q-answer">SQL injection: Attacker inserts SQL code into an input field. Example: URL input = "x'; DROP TABLE urls; --" If you concatenate this into a SQL string: SELECT * FROM urls WHERE original_url = 'x'; DROP TABLE urls; --' → tables deleted! Prevention: ALWAYS use parameterized queries (prepared statements) where values are passed separately from the SQL structure. The database driver treats input as data, never as SQL code.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q34: What is an Open Redirect vulnerability?</div>
+  <div class="q-answer">If our server blindly redirects to any user-supplied URL, an attacker could create: swifturl.com/r/evil → redirects to "javascript:steal-cookies()" or to a phishing site that looks like our login page. Prevention: Validate that all stored URLs start with http:// or https:// and block javascript:, data:, vbscript: protocol schemes.</div>
+</div>
+
+<div class="domain-header">DOMAIN 10: SYSTEM DESIGN & SCALABILITY</div>
+
+<div class="q-card">
+  <div class="q-title">Q35: Design the system to handle 10 billion existing URLs. How do you approach the database?</div>
+  <div class="q-answer">At 10 billion URLs with ~200 bytes per row = ~2TB of URL data. Single PostgreSQL instance would struggle. Solution: Horizontal sharding — partition the urls table by hash(short_code) % N across N database servers. Each server handles 1/N of the URLs. The short_code's first character can be used as a shard key. Add read replicas for each shard to handle high redirect traffic.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q36: What is Consistent Hashing and why is it better for scaling Redis?</div>
+  <div class="q-answer">Simple hashing (short_code % 3 servers): If you add a 4th server, almost all keys map to different servers — massive cache invalidation, thundering herd on the database. Consistent Hashing: Keys and servers are placed on a hash ring. Adding a new server only remaps keys between it and its neighbor (~1/N of all keys). Redis Cluster uses this concept with 16,384 hash slots distributed across nodes.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q37: How would you implement analytics for geographic distribution of clicks?</div>
+  <div class="q-answer">Integrate MaxMind GeoIP2 database lookup in the analytics consumer worker. When processing a click event, look up the client's IP address against the GeoIP database to get country, city, and latitude/longitude. Store in click_analytics table with country_code and city columns. Display a world map heatmap in the React dashboard.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q38: How would you add real-time click counters to the React dashboard (without polling)?</div>
+  <div class="q-answer">Use WebSockets. When the analytics consumer worker processes a click, it also publishes to a Redis Pub/Sub channel (analytics:live:{short_code}). A WebSocket gateway server subscribes to Redis Pub/Sub and pushes updates to all connected React clients watching that short code. React receives WebSocket frames and updates the chart in real-time without HTTP polling.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q39: What is the CAP theorem and how does it apply to your system?</div>
+  <div class="q-answer">CAP Theorem: A distributed system can guarantee at most 2 of: Consistency (all nodes see same data), Availability (system responds to every request), Partition Tolerance (system works even if network splits). Our Redis cache sacrifices strong Consistency (cache may be stale) for Availability + Partition Tolerance (CP vs AP choice). PostgreSQL (primary + replicas) chooses Consistency + Partition Tolerance (CP), meaning reads from replicas may be slightly stale during network partitions.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Q40: What is the read-to-write ratio in a URL shortener and why does it matter architecturally?</div>
+  <div class="q-answer">URL shorteners have approximately 100:1 to 1000:1 read-to-write ratio. For every URL created (write), thousands of people click it (reads). This dictates our entire architecture: heavy caching optimization (Redis serves 99% of reads), read replicas in PostgreSQL, and async writes via RabbitMQ so writes don't block the high-frequency reads.</div>
+</div>
+
+</body>
+</html>

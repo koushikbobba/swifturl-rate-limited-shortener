@@ -7,27 +7,28 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build-cpp-backend:
-    name: Build & Test C++ Crow API Backend
+  build-node-backend:
+    name: Build & Test Node.js PERN API Backend
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Install C++ Compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++ cmake make
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
 
-      - name: Build C++ Executable
+      - name: Install Dependencies
         run: |
-          g++ -O2 -std=c++17 backend/src/main.cpp -Ibackend/include -pthread -o backend/url_shortener_server
-          chmod +x backend/url_shortener_server
+          cd backend
+          npm install
 
-      - name: Verify C++ Build Success
+      - name: Verify Backend Integrity
         run: |
-          ls -lh backend/url_shortener_server
+          cd backend
+          npm ls
 
   build-react-frontend:
     name: Build & Lint React Frontend

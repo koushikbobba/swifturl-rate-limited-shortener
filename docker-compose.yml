@@ -53,20 +53,26 @@ services:
       timeout: 5s
       retries: 5
 
-  # 4. C++ Crow Backend API Server
+  # 4. Node.js PERN Backend API Server
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: shortener_cpp_backend
+    container_name: shortener_node_backend
     restart: always
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgres://shortener_user:shortener_pass@postgres:5432/shortener_db
+      - DB_USER=shortener_user
+      - DB_PASSWORD=shortener_pass
+      - DB_NAME=shortener_db
+      - DB_HOST=postgres
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+      - JWT_SECRET=super_secret_jwt_key_for_swifturl_project_which_should_be_long
     depends_on:
       postgres:
         condition: service_healthy
