@@ -35,13 +35,13 @@ export default function Navbar({ user, onOpenAuth, onLogout, onOpenResumeModal }
         {/* System Architecture Pills */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span className="badge-pill badge-cyan">
-            <Cpu size={14} /> C++ Crow Engine
+            <Cpu size={14} /> Node.js Express API
           </span>
           <span className="badge-pill badge-purple">
-            <Database size={14} /> Redis + Postgres
+            <Database size={14} /> SQLite Local DB
           </span>
           <span className="badge-pill badge-green">
-            <Activity size={14} /> RabbitMQ Queue
+            <Activity size={14} /> In-Memory Cache
           </span>
         </div>
 

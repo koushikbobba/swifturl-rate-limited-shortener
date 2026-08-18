@@ -7,7 +7,10 @@ import ResumeModal from './components/ResumeModal';
 import { Heart, Award, Code2 } from 'lucide-react';
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('user_info');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const [urls, setUrls] = useState([
@@ -25,7 +28,10 @@ export default function App() {
 
   const fetchUserUrls = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/user/urls');
+      const token = localStorage.getItem('jwt_token');
+      const response = await fetch('http://localhost:8080/api/user/urls', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (response.ok) {
         const data = await response.json();
         if (data.urls && data.urls.length > 0) {
@@ -39,7 +45,10 @@ export default function App() {
 
   const fetchAnalytics = async (code) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/analytics/${code}`);
+      const token = localStorage.getItem('jwt_token');
+      const response = await fetch(`http://localhost:8080/api/analytics/${code}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (response.ok) {
         const data = await response.json();
         setAnalyticsData(data);
@@ -76,13 +85,16 @@ export default function App() {
   };
 
   const handleAuthSuccess = (authData) => {
-    setUser(authData.user);
+    const userInfo = { username: authData.username };
+    setUser(userInfo);
     localStorage.setItem('jwt_token', authData.token);
+    localStorage.setItem('user_info', JSON.stringify(userInfo));
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user_info');
   };
 
   return (

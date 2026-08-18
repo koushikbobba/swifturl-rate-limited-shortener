@@ -17,9 +17,13 @@ export default function ShortenerCard({ onUrlCreated, rateLimitRemaining }) {
     setErrorMsg(null);
 
     try {
+      const token = localStorage.getItem('jwt_token');
       const response = await fetch('http://localhost:8080/api/shorten', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           original_url: originalUrl,
           custom_slug: customSlug || undefined
@@ -62,7 +66,7 @@ export default function ShortenerCard({ onUrlCreated, rateLimitRemaining }) {
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '6px' }}>Shorten Long URL</h2>
           <p style={{ color: '#94a3b8', fontSize: '14px' }}>
-            Generates high-speed Base62 short links cached in Redis with sliding-window rate protection.
+            Generates high-speed Base62 short links with sliding-window rate protection.
           </p>
         </div>
 
