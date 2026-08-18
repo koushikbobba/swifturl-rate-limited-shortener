@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SwiftURL — Complete Project Explanation, Architecture & 100 Interview Q&A</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+  @page { size: A4; margin: 12mm; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; line-height: 1.55; background: #fff; font-size: 11.5px; }
+
+  h1 { font-size: 19px; font-weight: 900; color: #0284c7; border-bottom: 3px solid #0284c7; padding-bottom: 5px; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #475569; font-weight: 700; margin-bottom: 16px; }
+  h2 { font-size: 14.5px; font-weight: 800; color: #0f172a; margin-top: 18px; margin-bottom: 6px; border-bottom: 2px solid #e2e8f0; padding-bottom: 3px; page-break-after: avoid; }
+  h3 { font-size: 13px; font-weight: 700; color: #0369a1; margin-top: 12px; margin-bottom: 4px; page-break-after: avoid; }
+
+  pre { font-family: 'JetBrains Mono', monospace; background: #0f172a; color: #38bdf8; padding: 10px 12px; font-size: 10px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; line-height: 1.35; margin: 8px 0; }
+  code { font-family: 'JetBrains Mono', monospace; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1px 4px; font-size: 10.5px; }
+
+  .tech-block { background: #f8fafc; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 8px 12px; margin: 8px 0; page-break-inside: avoid; }
+  .tech-name { font-weight: 800; color: #0284c7; font-size: 12.5px; margin-bottom: 3px; }
+
+  .q-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 11px; margin-bottom: 8px; page-break-inside: avoid; }
+  .q-title { font-weight: 800; color: #0f172a; font-size: 12px; margin-bottom: 3px; }
+  .q-answer { color: #334155; font-size: 11.5px; }
+
+  .domain-header { background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; padding: 6px 12px; font-size: 13px; font-weight: 800; border-radius: 5px; margin-top: 16px; margin-bottom: 10px; page-break-after: avoid; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+
+  .badge { display: inline-block; background: #0284c7; color: white; border-radius: 4px; padding: 2px 7px; font-size: 9.5px; font-weight: 700; margin-left: 5px; vertical-align: middle; }
+  .badge-green { background: #059669; }
+  .badge-purple { background: #7c3aed; }
+  .badge-orange { background: #ea580c; }
+  .badge-red { background: #dc2626; }
+</style>
+</head>
+<body>
+
+<h1>🚀 SwiftURL — Master System Guide & 100 Interview Q&A</h1>
+<div class="subtitle">Complete Node.js, Express, SQLite, React & In-Memory System Architecture | Engineered by Koushik Bobba</div>
+
+<!-- ============================================================ -->
+<h2>SECTION 1: WHAT THE PROJECT DOES (Executive Summary)</h2>
+<!-- ============================================================ -->
+<p>SwiftURL is a full-stack, rate-limited URL shortener web application with real-time click analytics. It transforms long, complex destination web addresses (e.g., <code>https://mail.google.com/mail/u/0/#inbox/FMfcgz...</code>) into short, elegant 6-character links (e.g., <code>http://localhost:8080/r/q0V</code>).</p>
+<p><strong>Core Capabilities:</strong></p>
+<ul>
+  <li><strong>Instant Redirects:</strong> Redirects incoming short link clicks to original destination URLs in under 1 millisecond using in-memory caching.</li>
+  <li><strong>Sliding-Window Rate Protection:</strong> Restricts request traffic per client IP (10 requests per 60 seconds) to defend against DDoS attacks and spamming.</li>
+  <li><strong>Collision-Free Code Generation:</strong> Uses Base62 encoding over a monotonically increasing auto-increment integer sequence.</li>
+  <li><strong>Non-Blocking Analytics Logging:</strong> Decouples HTTP 302 redirects from SQLite database writes using asynchronous event scheduling.</li>
+  <li><strong>Stateless JWT Authentication:</strong> Secure user registration and login with bcrypt password hashing and JWT token persistence.</li>
+  <li><strong>Glassmorphic Analytics Dashboard:</strong> Interactive React dashboard with Recharts visualizations, short link click counters, and device metrics.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>SECTION 2: END-TO-END PIPELINE DIAGRAM & WORKFLOW</h2>
+<!-- ============================================================ -->
+<pre>
+                               ┌──────────────────────────────────────────────────────────┐
+                               │                    REACT FRONTEND (Vite @ :5173)         │
+                               │  - User Auth State (localStorage JWT + User Persistence) │
+                               │  - Recharts Throughput Graphs & Glassmorphism UI          │
+                               └────────────────────────────┬─────────────────────────────┘
+                                                            │
+                                                            │ HTTP REST API Requests (JSON / Auth Headers)
+                                                            ▼
+                               ┌──────────────────────────────────────────────────────────┐
+                               │                   EXPRESS.JS BACKEND (Node.js @ :8080)   │
+                               │  - CORS Middleware & JSON Body Parsing                  │
+                               │  - JWT Bearer Authentication Verification                │
+                               └──────┬─────────────────────┬──────────────────────┬──────┘
+                                      │                     │                      │
+                   ┌──────────────────┘                     │                      └──────────────────┐
+                   ▼                                        ▼                                         ▼
+   ┌──────────────────────────────┐       ┌──────────────────────────────────┐       ┌──────────────────────────────────┐
+   │ IN-MEMORY CACHE (Map)        │       │ IN-MEMORY RATE LIMITER           │       │ SQLITE DATABASE                  │
+   │ - Stores `url:{code}`        │       │ - Map&lt;IP, timestamp[]&gt;           │       │ - `database.sqlite`              │
+   │ - Sub-millisecond O(1) fetch │       │ - Sliding Window Log (60s limit) │       │ - `users`, `urls`, `analytics`   │
+   └──────────────────────────────┘       └──────────────────────────────────┘       └──────────────────────────────────┘
+                                                            │
+                                                            ▼ (Async non-blocking event loop execution)
+                                          ┌──────────────────────────────────┐
+                                          │ ASYNC CLICK ANALYTICS LOGGER     │
+                                          │ - Records IP, User-Agent, time   │
+                                          │ - Increments URL click_count     │
+                                          └──────────────────────────────────┘
+</pre>
+
+<h3>Step-by-Step Execution Workflows:</h3>
+<p><strong>Workflow A: Shortening a Link</strong></p>
+<ol>
+  <li>User inputs a long URL into the React frontend and clicks "Create Short Link".</li>
+  <li>Frontend retrieves the JWT token from <code>localStorage</code> and attaches it as <code>Authorization: Bearer &lt;token&gt;</code>.</li>
+  <li>Express receives <code>POST /api/shorten</code>. The <code>rateLimiter</code> middleware verifies that the client IP has not exceeded 10 requests in the past 60 seconds.</li>
+  <li>The <code>authMiddleware</code> verifies the JWT token signature using <code>jsonwebtoken</code>.</li>
+  <li>The backend inserts a new record into SQLite (`urls` table), receives the auto-increment ID (e.g., `100000`), and passes it to `encode(id)`, producing short code `q0V`.</li>
+  <li>The original URL and short code mapping are cached in the in-memory JavaScript <code>Map</code>.</li>
+  <li>Express returns HTTP 201 Created with the short URL object back to the React UI.</li>
+</ol>
+
+<p><strong>Workflow B: Redirecting & Analytics</strong></p>
+<ol>
+  <li>A visitor hits <code>GET /r/q0V</code>.</li>
+  <li>The server checks the in-memory cache map first. (Cache Hit = ~0.01ms lookup).</li>
+  <li>If Cache Miss, it queries SQLite, fetches the destination URL, and populates the cache.</li>
+  <li>The server immediately issues an HTTP 302 Found redirect with the <code>Location</code> header set to the destination URL.</li>
+  <li>Simultaneously, a <code>setTimeout(..., 0)</code> non-blocking function is dispatched to log IP address, User-Agent, referrer, and timestamp to the <code>click_analytics</code> table without delaying the user's redirect.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2>SECTION 3: HOW THE PROJECT WAS DONE (Detailed Architecture)</h2>
+<!-- ============================================================ -->
+<div class="tech-block">
+  <div class="tech-name">Backend: Node.js & Express.js</div>
+  <p>Structured modularly into clear separation of concerns: <code>src/db</code> for database connections, <code>src/middleware</code> for auth and rate limiting, <code>src/routes</code> for API endpoints, and <code>src/utils</code> for encoding logic. Uses ES6+ standard functions and async/await syntax.</p>
+</div>
+
+<div class="tech-block">
+  <div class="tech-name">Database: SQLite 3</div>
+  <p>File-based relational database (`database.sqlite`) managed via <code>sqlite3</code> and <code>sqlite</code> promise wrappers. On startup, <code>initDb()</code> automatically creates tables and indexes if they do not exist:
+  <br>• <code>users</code>: Stores `id`, `username`, `email`, `password_hash`, `created_at`.
+  <br>• <code>urls</code>: Stores `id`, `user_id`, `short_code`, `original_url`, `click_count`, `created_at`.
+  <br>• <code>click_analytics</code>: Stores `id`, `short_code`, `ip_address`, `user_agent`, `referrer`, `clicked_at`.
+  </p>
+</div>
+
+<div class="tech-block">
+  <div class="tech-name">Algorithm: Base62 Encoder</div>
+  <p>Encodes base-10 integer sequence numbers into Base62 alphanumeric strings using character set <code>[0-9a-zA-Z]</code>. Supports over 56.8 billion unique 6-character links ($62^6$) with zero hash collisions.</p>
+</div>
+
+<div class="tech-block">
+  <div class="tech-name">Frontend: React 18 + Vite</div>
+  <p>Built with functional components and custom hooks. Features a responsive frosted-glass UI system, persistent localStorage auth state management, Recharts click trend visualizations, and custom error/loading feedback components.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>SECTION 4: ISSUES FACED & ENGINEERING RESOLUTIONS</h2>
+<!-- ============================================================ -->
+
+<div class="q-card">
+  <div class="q-title">Issue 1: Docker Desktop & WSL Daemon Crashes on Windows</div>
+  <div class="q-answer"><strong>Root Cause:</strong> Docker Desktop failed to start on Windows due to a corrupted Windows Subsystem for Linux installation (`Wsl/CallMsi/Install/REGDB_E_CLASSNOTREG`).<br><strong>Resolution:</strong> Shifted architecture from a heavy Docker Compose container setup to a zero-install local architecture using SQLite and in-memory caching. This made the project run natively on any OS with simple <code>node index.js</code> execution.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Issue 2: GitHub Actions CI Build Failures (Node Version Mismatch)</div>
+  <div class="q-answer"><strong>Root Cause:</strong> GitHub Actions Ubuntu runner defaulted to Node.js 18, but Vite 8 required Node.js &gt;= 20.19.0 or 22.12.0, causing CI build job failures.<br><strong>Resolution:</strong> Explicitly configured <code>actions/setup-node@v3</code> with <code>node-version: 22</code> in <code>.github/workflows/ci.yml</code>.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Issue 3: Missing Authorization Headers & JWT Verification Failures</div>
+  <div class="q-answer"><strong>Root Cause:</strong> Frontend API calls in <code>ShortenerCard.jsx</code> and <code>App.jsx</code> were missing the <code>Authorization: Bearer &lt;token&gt;</code> HTTP header, causing the backend's strict <code>authMiddleware</code> to reject link shortening with a 401 "Missing or invalid token" error.<br><strong>Resolution:</strong> Updated all frontend <code>fetch()</code> headers to retrieve the token from <code>localStorage.getItem('jwt_token')</code> and pass it in the request.</div>
+</div>
+
+<div class="q-card">
+  <div class="q-title">Issue 4: User Authentication State Loss on Page Reload</div>
+  <div class="q-answer"><strong>Root Cause:</strong> React `user` state initialized to `null` on page mount, forcing logged-in users to re-authenticate every time the page was refreshed.<br><strong>Resolution:</strong> Saved user credentials (`user_info`) in <code>localStorage</code> alongside the JWT token and initialized React state with an inline initializer function reading from <code>localStorage</code>.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>SECTION 5: INTERVIEW SCRIPT & PITCH GUIDE</h2>
+<!-- ============================================================ -->
+
+<h3>The 30-Second Elevator Pitch</h3>
+<div class="tech-block">
+  <p><em>"I engineered SwiftURL — a full-stack, rate-limited URL shortener with real-time analytics. The backend is built with Node.js, Express, and SQLite, featuring an in-memory sliding-window rate limiter (10 req/60s) to prevent DDoS attacks, and Base62 encoding on auto-incrementing integer IDs to guarantee 100% collision-free short codes. It utilizes an in-memory cache to deliver sub-millisecond HTTP 302 redirects, and an interactive React frontend with Recharts analytics visualizations."</em></p>
+</div>
+
+<h3>The 2-Minute Architecture Deep Dive Script</h3>
+<div class="tech-block">
+  <p><strong>1. Problem & Base62 Solution:</strong> "In URL shorteners, random hashing algorithms like MD5 or SHA256 cause hash collisions as the database grows, requiring expensive SELECT queries to verify uniqueness. I solved this by using Base62 encoding over a monotonically increasing integer sequence. Every integer converts to a unique 6-character code (e.g., ID 100000 becomes `q0V`), guaranteeing zero collisions across 56.8 billion links."</p>
+  <p><strong>2. High-Speed Redirects & Caching:</strong> "For redirects, low latency is critical. I implemented a Cache-Aside pattern using an in-memory Map. When a user clicks a short code, the server checks memory first. On a hit, it returns an HTTP 302 redirect in 0.01ms without touching disk storage."</p>
+  <p><strong>3. Sliding-Window Rate Limiting:</strong> "To prevent abuse, I built a Sliding Window Log rate limiter middleware. It tracks client request timestamps per IP in an in-memory rolling 60-second window, returning HTTP 429 if the request count exceeds 10."</p>
+  <p><strong>4. Decoupled Async Analytics:</strong> "To prevent analytics database writes from slowing down redirects, I decoupled the click-logging process using Node.js event loop scheduling (`setTimeout`). The user receives their 302 redirect immediately while click metrics are written to SQLite asynchronously."</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>SECTION 6: 100 INTERVIEW QUESTIONS & COMPREHENSIVE ANSWERS</h2>
+<!-- ============================================================ -->
+
+<div class="domain-header">DOMAIN 1: PROJECT ARCHITECTURE & DESIGN DECISIONS (Q1 - Q10)</div>
+
+<div class="q-card"><div class="q-title">Q1: What is the primary purpose of your application?</div><div class="q-answer">SwiftURL is a full-stack rate-limited URL shortener that converts long URLs into 6-character Base62 short links, providing fast HTTP 302 redirects, rate limiting, stateless JWT auth, and click analytics tracking.</div></div>
+<div class="q-card"><div class="q-title">Q2: Why did you choose Node.js and Express for the backend?</div><div class="q-answer">Node.js provides a single-threaded, non-blocking asynchronous I/O event loop ideal for high-concurrency HTTP redirect services. Express offers lightweight, flexible routing and middleware integration.</div></div>
+<div class="q-card"><div class="q-title">Q3: What is the difference between a URL shortener and a standard web server?</div><div class="q-answer">A URL shortener is heavily optimized for a high read-to-write ratio (100:1+), requiring aggressive caching, low-latency 302 redirects, collision-free short code generation, and async click tracking.</div></div>
+<div class="q-card"><div class="q-title">Q4: Why use SQLite instead of a full database server like PostgreSQL or MySQL?</div><div class="q-answer">SQLite is serverless, zero-configuration, and stores data in a single local file. It eliminates network socket overhead for queries, making it extremely fast for read-heavy local deployments.</div></div>
+<div class="q-card"><div class="q-title">Q5: How does your application decouple analytics writes from HTTP redirects?</div><div class="q-answer">Using non-blocking event loop scheduling (`setTimeout(..., 0)`). The HTTP 302 redirect is returned instantly to the user while click logging to SQLite executes asynchronously on the next event loop tick.</div></div>
+<div class="q-card"><div class="q-title">Q6: What design pattern did you use for caching?</div><div class="q-answer">The Cache-Aside pattern (Lazy Loading). The server checks the in-memory Map cache first. If a cache miss occurs, it queries SQLite, populates the cache with the destination URL, and returns the result.</div></div>
+<div class="q-card"><div class="q-title">Q7: How do you prevent short link collisions?</div><div class="q-answer">By encoding auto-incrementing integer IDs into Base62 strings. Since each integer ID generated by SQLite is unique, every encoded Base62 string is mathematically guaranteed to be unique.</div></div>
+<div class="q-card"><div class="q-title">Q8: How many unique short URLs can a 6-character Base62 string support?</div><div class="q-answer">$62^6 = 56,800,235,584$ (56.8 billion) unique links.</div></div>
+<div class="q-card"><div class="q-title">Q9: What HTTP status code do you use for redirects and why?</div><div class="q-answer">HTTP 302 Found (Temporary Redirect). HTTP 301 is permanently cached by browsers, preventing the server from receiving future click events for analytics. 302 forces every click to hit the server.</div></div>
+<div class="q-card"><div class="q-title">Q10: What HTTP status code is returned when rate limits are exceeded?</div><div class="q-answer">HTTP 429 Too Many Requests.</div></div>
+
+<div class="domain-header">DOMAIN 2: NODE.JS & ASYNCHRONOUS EVENT LOOP (Q11 - Q20)</div>
+
+<div class="q-card"><div class="q-title">Q11: Explain how the Node.js Event Loop handles non-blocking I/O.</div><div class="q-answer">Node.js delegates I/O operations to the operating system or libuv thread pool. Once complete, callbacks are placed in event queues and executed on the single main thread during event loop phases.</div></div>
+<div class="q-card"><div class="q-title">Q12: What is the difference between `process.nextTick()` and `setTimeout(fn, 0)`?</div><div class="q-answer">`process.nextTick()` executes immediately after the current operation finishes before the event loop continues. `setTimeout(fn, 0)` schedules the callback in the Timers phase of the next loop iteration.</div></div>
+<div class="q-card"><div class="q-title">Q13: Why is blocking the event loop dangerous in Node.js?</div><div class="q-answer">Because Node.js executes application logic on a single thread. CPU-heavy or synchronous blocking calls freeze the entire server, preventing all incoming HTTP requests from being processed.</div></div>
+<div class="q-card"><div class="q-title">Q14: How does Express middleware chaining work via `next()`?</div><div class="q-answer">Express executes middleware functions sequentially. Calling `next()` passes control to the next middleware in the stack. If `next(err)` is called with an argument, it triggers error-handling middleware.</div></div>
+<div class="q-card"><div class="q-title">Q15: What is CommonJS vs ES Modules in Node.js?</div><div class="q-answer">CommonJS uses `require()` and `module.exports` (synchronous, default in Node.js). ES Modules use `import` and `export` (asynchronous, static structure). Our backend uses CommonJS.</div></div>
+<div class="q-card"><div class="q-title">Q16: How do environment variables work in Node.js?</div><div class="q-answer">Loaded from `.env` files into `process.env` using the `dotenv` package, allowing configuration settings (ports, secrets) to be kept separate from codebase logic.</div></div>
+<div class="q-card"><div class="q-title">Q17: How do you handle unhandled promise rejections in Express?</div><div class="q-answer">Using `try/catch` blocks inside `async` route handlers or wrapping routes in an async error-handling wrapper function to pass errors to Express `next(err)`.</div></div>
+<div class="q-card"><div class="q-title">Q18: What is memory leak in Node.js and how can it happen in our caching layer?</div><div class="q-answer">If an in-memory Map cache grows indefinitely without an eviction policy (like LRU) or TTL expiration, it will eventually consume all heap RAM and crash Node.js with Out-Of-Memory error.</div></div>
+<div class="q-card"><div class="q-title">Q19: What is `req.ip` behind proxies?</div><div class="q-answer">`req.ip` fetches the client IP. Behind reverse proxies like NGINX or Cloudflare, Express must be configured with `app.set('trust proxy', true)` to read the original client IP from the `X-Forwarded-For` header.</div></div>
+<div class="q-card"><div class="q-title">Q20: Why did you use `cors()` middleware?</div><div class="q-answer">Browser Same-Origin Policy blocks frontend JavaScript on port 5173 from making HTTP requests to port 8080. `cors()` adds `Access-Control-Allow-Origin` headers to enable cross-port API calls.</div></div>
+
+<div class="domain-header">DOMAIN 3: REACT FRONTEND & UI ENGINEERING (Q21 - Q30)</div>
+
+<div class="q-card"><div class="q-title">Q21: Why use Vite over Create React App (CRA)?</div><div class="q-answer">Vite leverages native browser ES Modules during development for sub-second server startup and instant Hot Module Replacement (HMR), unlike CRA which bundle-compiles everything with Webpack.</div></div>
+<div class="q-card"><div class="q-title">Q22: How do you manage user login state persistence across browser refreshes?</div><div class="q-answer">We store the JWT token and `user_info` object in browser `localStorage`. On React startup, `useState` reads from `localStorage` to initialize the `user` state synchronously before initial render.</div></div>
+<div class="q-card"><div class="q-title">Q23: How do you handle asynchronous API loading states in React?</div><div class="q-answer">Using a boolean state variable `const [loading, setLoading] = useState(false)`. Set to `true` before fetching, disable submit buttons / show spinner, and reset to `false` in a `finally` block.</div></div>
+<div class="q-card"><div class="q-title">Q24: What is Glassmorphism CSS design?</div><div class="q-answer">A UI design trend featuring translucent container panels with frosted-glass effect achieved using `background: rgba(...)`, `border: 1px solid rgba(...)`, and `backdrop-filter: blur(...)`.</div></div>
+<div class="q-card"><div class="q-title">Q25: What is Recharts and how does it render graphs?</div><div class="q-answer">Recharts is a React charting library built on top of SVG elements. It dynamically computes data points into SVG `<path>` shapes for crisp rendering across device screen resolutions.</div></div>
+<div class="q-card"><div class="q-title">Q26: Why use inline function initializer in `useState`?</div><div class="q-answer">Passing a function `useState(() => localStorage.getItem(...))` ensures the expensive `localStorage` read operation runs ONLY ONCE during initial component mounting, not on every re-render.</div></div>
+<div class="q-card"><div class="q-title">Q27: How does child-to-parent state communication work in React?</div><div class="q-answer">The parent component passes a callback function as a prop (e.g., `onAuthSuccess`). The child component invokes the callback function with payload data, updating the parent's state.</div></div>
+<div class="q-card"><div class="q-title">Q28: How do you handle clipboard copy functionality in React?</div><div class="q-answer">Using the modern asynchronous Navigator API: `navigator.clipboard.writeText(url)`.</div></div>
+<div class="q-card"><div class="q-title">Q29: What is conditional rendering in React?</div><div class="q-answer">Rendering different UI elements based on state variables using ternary operators (`user ? <Profile/> : <LoginBtn/>`) or short-circuit evaluation (`{error && <Alert/>}`).</div></div>
+<div class="q-card"><div class="q-title">Q30: Why pass `Authorization: Bearer <token>` headers in React `fetch()` calls?</div><div class="q-answer">To authenticate API requests against protected backend endpoints. The `authMiddleware` reads the header, verifies the JWT, and extracts user identity.</div></div>
+
+<div class="domain-header">DOMAIN 4: SQLITE & RELATIONAL DATABASE MANAGEMENT (Q31 - Q40)</div>
+
+<div class="q-card"><div class="q-title">Q31: What is SQLite and how does it differ from PostgreSQL?</div><div class="q-answer">SQLite is an embedded, serverless, file-based SQL database engine running inside the application process. PostgreSQL is a client-server database requiring a separate running process and network connections.</div></div>
+<div class="q-card"><div class="q-title">Q32: How are auto-incrementing IDs represented in SQLite?</div><div class="q-answer">Using `INTEGER PRIMARY KEY AUTOINCREMENT`. SQLite automatically assigns sequential 64-bit integers to new rows.</div></div>
+<div class="q-card"><div class="q-title">Q33: What is `FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE`?</div><div class="q-answer">A constraint enforcing referential integrity. `ON DELETE CASCADE` automatically deletes all associated URLs if the parent user row is deleted from the `users` table.</div></div>
+<div class="q-card"><div class="q-title">Q34: What is a B-Tree database index and why did we add them?</div><div class="q-answer">A B-Tree index is a balanced tree data structure. We added indexes on `short_code` and `user_id` to turn linear full-table scans $O(N)$ into logarithmic $O(\log N)$ lookups.</div></div>
+<div class="q-card"><div class="q-title">Q35: How does SQLite handle concurrent writes?</div><div class="q-answer">SQLite locks the entire database file during write transactions. It supports multiple concurrent readers, but only ONE writer at a time.</div></div>
+<div class="q-card"><div class="q-title">Q36: What is SQL Injection and how do parameter placeholders (`?`) prevent it?</div><div class="q-answer">SQL Injection occurs when un-sanitized user input is concatenated into SQL queries. Parameterized queries (`?`) separate code from data—the DB engine treats inputs purely as values, never SQL commands.</div></div>
+<div class="q-card"><div class="q-title">Q37: What is `result.lastID` in the SQLite Node driver?</div><div class="q-answer">Returns the auto-increment integer ID generated for the row inserted by the most recent `INSERT` statement.</div></div>
+<div class="q-card"><div class="q-title">Q38: Why store passwords as `password_hash` instead of plain text?</div><div class="q-answer">Storing plain-text passwords is a severe security violation. Hashes produced by bcrypt cannot be reversed to reveal original passwords even if the database is leaked.</div></div>
+<div class="q-card"><div class="q-title">Q39: What is ACID compliance in database systems?</div><div class="q-answer">Atomicity (all-or-nothing), Consistency (rules enforced), Isolation (concurrency protection), Durability (committed data survives crashes). SQLite is fully ACID compliant.</div></div>
+<div class="q-card"><div class="q-title">Q40: How do you alter a schema in SQLite?</div><div class="q-answer">SQLite supports limited `ALTER TABLE` operations (like adding columns). For complex structural changes, developers create a new table, copy data over, drop the old table, and rename.</div></div>
+
+<div class="domain-header">DOMAIN 5: BASE62 ENCODING & ALGORITHMS (Q41 - Q50)</div>
+
+<div class="q-card"><div class="q-title">Q41: What characters make up the Base62 alphabet?</div><div class="q-answer">Digits `0-9` (10), lowercase `a-z` (26), and uppercase `A-Z` (26) = 62 total URL-safe characters.</div></div>
+<div class="q-card"><div class="q-title">Q42: Why Base62 instead of Base64 for short URLs?</div><div class="q-answer">Base64 contains `+`, `/`, and `=` characters. In URLs, `/` acts as a path separator and `+` represents spaces, causing HTTP routing bugs. Base62 contains only alphanumeric characters.</div></div>
+<div class="q-card"><div class="q-title">Q43: How does Base62 conversion work mathematically?</div><div class="q-answer">Repeatedly divide the auto-increment integer ID by 62, taking the remainder at each step to index into the Base62 character array, until the quotient reaches zero.</div></div>
+<div class="q-card"><div class="q-title">Q44: Convert integer ID `100000` to Base62 manually.</div><div class="q-answer">100000 % 62 = 16 ('g'), 1612 % 62 = 0 ('0'), 26 % 62 = 26 ('q'). Reversing the remainders yields `"q0g"`.</div></div>
+<div class="q-card"><div class="q-title">Q45: Why is counter-based Base62 better than random string generation?</div><div class="q-answer">Random strings suffer from the Birthday Paradox collision problem—as database size grows, duplicate collision checks require expensive `SELECT` queries. Integer counters guarantee uniqueness.</div></div>
+<div class="q-card"><div class="q-title">Q46: Is Base62 encoding an encryption algorithm?</div><div class="q-answer">No. Base62 is a reversible positional number representation system (like binary or hexadecimal), not encryption. Anyone can decode a Base62 string back to its original integer ID.</div></div>
+<div class="q-card"><div class="q-title">Q47: How do custom URL slugs interact with the Base62 algorithm?</div><div class="q-answer">Custom slugs bypass the Base62 encoder. They are inserted directly into the database's `custom_slug` and `short_code` columns after checking for uniqueness constraints.</div></div>
+<div class="q-card"><div class="q-title">Q48: What is sequential prediction vulnerability and how can it be mitigated?</div><div class="q-answer">Sequential Base62 codes (`q0g`, `q0h`, `q0i`) allow attackers to scrape links by incrementing codes. Mitigation: shuffle/permute the Base62 alphabet array using a secret key.</div></div>
+<div class="q-card"><div class="q-title">Q49: What is BigInt in JavaScript and why is it useful for Base62?</div><div class="q-answer">JavaScript standard `Number` loses precision above $2^{53} - 1$ ($9,007,199,254,740,991$). `BigInt` handles arbitrarily large integers without precision loss.</div></div>
+<div class="q-card"><div class="q-title">Q50: What is the maximum string length of Base62 for a 64-bit integer?</div><div class="q-answer">Maximum 11 characters ($62^{11} > 2^{64}$).</div></div>
+
+<div class="domain-header">DOMAIN 6: IN-MEMORY CACHING & PERFORMANCE (Q51 - Q60)</div>
+
+<div class="q-card"><div class="q-title">Q51: What is Cache-Aside caching pattern?</div><div class="q-answer">Application checks cache first. If hit -> return data. If miss -> read DB -> populate cache -> return data.</div></div>
+<div class="q-card"><div class="q-title">Q52: What is Cache Hit Ratio?</div><div class="q-answer">Percentage of total requests served directly from cache memory without hitting the database: $\frac{\text{Hits}}{\text{Hits} + \text{Misses}} \times 100$.</div></div>
+<div class="q-card"><div class="q-title">Q53: What is Cache Stampede (Thundering Herd)?</div><div class="q-answer">When a popular cached key expires, thousands of concurrent requests miss the cache simultaneously and overwhelm the database. Solved using distributed locking or stale-while-revalidate.</div></div>
+<div class="q-card"><div class="q-title">Q54: What is time complexity of JavaScript `Map.get()` and `Map.set()`?</div><div class="q-answer">$O(1)$ constant average time complexity using internal hash map buckets.</div></div>
+<div class="q-card"><div class="q-title">Q55: What is LRU (Least Recently Used) eviction policy?</div><div class="q-answer">A cache eviction algorithm that automatically discards the least recently accessed items when the cache reaches its memory size capacity limit.</div></div>
+<div class="q-card"><div class="q-title">Q56: What is Cache Invalidation?</div><div class="q-answer">The process of removing or updating cached data when the underlying database source data changes or is deleted.</div></div>
+<div class="q-card"><div class="q-title">Q57: Difference between In-Memory Cache vs Redis?</div><div class="q-answer">In-Memory Cache lives inside the single Node.js process heap (zero network overhead, lost on process restart). Redis is an external shared cache service accessible across multiple distributed app servers.</div></div>
+<div class="q-card"><div class="q-title">Q58: What is Cache Penetration?</div><div class="q-answer">Requests for keys that exist neither in cache nor in database (e.g. invalid short codes). Prevented by caching `null` values with short TTLs or using Bloom Filters.</div></div>
+<div class="q-card"><div class="q-title">Q59: Why is HTTP 302 preferred over 301 for tracking analytics?</div><div class="q-answer">Browsers cache 301 Permanent Redirects indefinitely, bypassing our server on subsequent clicks. 302 Temporary Redirects ensure every click reaches our server to record analytics metrics.</div></div>
+<div class="q-card"><div class="q-title">Q60: What is response latency of an in-memory Map lookup?</div><div class="q-answer">Approximately $0.001\text{ms} - 0.01\text{ms}$ (sub-millisecond), compared to $2\text{ms} - 15\text{ms}$ for disk database lookups.</div></div>
+
+<div class="domain-header">DOMAIN 7: RATE LIMITING & SECURITY (Q61 - Q70)</div>
+
+<div class="q-card"><div class="q-title">Q61: How does your Sliding Window Log Rate Limiter work?</div><div class="q-answer">It stores request timestamps in an array per client IP. On each request, it filters out timestamps older than 60 seconds (`now - 60000`). If remaining array length > 10, it rejects with HTTP 429.</div></div>
+<div class="q-card"><div class="q-title">Q62: Compare Sliding Window Log vs Fixed Window rate limiting.</div><div class="q-answer">Fixed Window resets counters at fixed clock intervals (e.g. 12:00, 12:01), allowing double-burst traffic at minute boundaries. Sliding Window Log evaluates exact rolling time windows, preventing boundary bursts.</div></div>
+<div class="q-card"><div class="q-title">Q63: What is Token Bucket rate limiting algorithm?</div><div class="q-answer">Tokens are added to a bucket at a constant fill rate up to a max capacity limit. Each request consumes a token. Allows controlled burst traffic while maintaining an average rate.</div></div>
+<div class="q-card"><div class="q-title">Q64: What is Leaky Bucket rate limiting algorithm?</div><div class="q-answer">Requests enter a bucket queue and exit at a fixed constant processing rate regardless of burst incoming volume, smoothing out spikes.</div></div>
+<div class="q-card"><div class="q-title">Q65: What headers should be returned with HTTP 429 Rate Limit responses?</div><div class="q-answer">`X-RateLimit-Limit: 10`, `X-RateLimit-Remaining: 0`, `Retry-After: 60`.</div></div>
+<div class="q-card"><div class="q-title">Q66: What is a DDoS attack?</div><div class="q-answer">Distributed Denial of Service: flooding a server with millions of automated requests from multiple botnet computers to overwhelm server resources and cause downtime.</div></div>
+<div class="q-card"><div class="q-title">Q67: What is an Open Redirect vulnerability and how do we prevent it?</div><div class="q-answer">Attacker inputs malicious destination URL (e.g. `javascript:steal()` or phishing sites). Prevented by strictly validating URL schemes to allow only `http://` and `https://`.</div></div>
+<div class="q-card"><div class="q-title">Q68: What is Cross-Site Scripting (XSS)?</div><div class="q-answer">Attacker injects malicious client-side JavaScript scripts into web pages viewed by other users. React automatically escapes strings rendered in JSX, preventing XSS.</div></div>
+<div class="q-card"><div class="q-title">Q69: What is Cross-Site Request Forgery (CSRF)?</div><div class="q-answer">Forces an authenticated user's browser to send unauthorized HTTP requests. Prevented by using custom HTTP `Authorization: Bearer` headers instead of auto-sent cookies.</div></div>
+<div class="q-card"><div class="q-title">Q70: Why use bcrypt for password hashing instead of SHA-256?</div><div class="q-answer">SHA-256 is a fast cryptographic hash—attackers can try billions of passwords per second via GPU brute force. Bcrypt is a slow, computationally expensive algorithm designed to resist hardware brute-force attacks.</div></div>
+
+<div class="domain-header">DOMAIN 8: AUTHENTICATION & JWT (Q71 - Q80)</div>
+
+<div class="q-card"><div class="q-title">Q71: What is JSON Web Token (JWT)?</div><div class="q-answer">An open standard (RFC 7519) defining a compact, self-contained method for securely transmitting verified claims between parties as a JSON object.</div></div>
+<div class="q-card"><div class="q-title">Q72: What are the three parts of a JWT string?</div><div class="q-answer">Header (algorithm & type), Payload (user claims), and Signature (HMAC-SHA256 hash), separated by dots (`.`).</div></div>
+<div class="q-card"><div class="q-title">Q73: Is the payload of a JWT encrypted?</div><div class="q-answer">No! It is Base64Url encoded, NOT encrypted. Anyone can decode and read the payload. Never put sensitive data like raw passwords or credit cards in a JWT payload.</div></div>
+<div class="q-card"><div class="q-title">Q74: How does JWT signature verification work?</div><div class="q-answer">The server re-computes `HMAC-SHA256(Base64(Header) + "." + Base64(Payload), secretKey)` and compares it with the token's signature. If it matches, the token is valid.</div></div>
+<div class="q-card"><div class="q-title">Q75: What is stateless authentication?</div><div class="q-answer">The server does not store session IDs in a database. All identity information is contained inside the signed JWT token presented by the client.</div></div>
+<div class="q-card"><div class="q-title">Q76: How do you revoke/invalidate a JWT token before it expires?</div><div class="q-answer">Since JWTs are stateless, instant revocation requires maintaining an in-memory blacklisting store (e.g. Redis) of revoked token signatures until their expiration time passes.</div></div>
+<div class="q-card"><div class="q-title">Q77: Where should JWT tokens be stored on the frontend?</div><div class="q-answer">Either `localStorage` / `sessionStorage` (vulnerable to XSS if site has script vulnerabilities) or `httpOnly`, `Secure` cookies (protected from XSS, vulnerable to CSRF if anti-CSRF tokens aren't used).</div></div>
+<div class="q-card"><div class="q-title">Q78: What is the `Bearer` token schema?</div><div class="q-answer">An HTTP HTTP authentication scheme header format: `Authorization: Bearer <JWT_TOKEN_STRING>`.</div></div>
+<div class="q-card"><div class="q-title">Q79: What happens if an attacker tampers with the JWT payload?</div><div class="q-answer">The HMAC signature check on the server fails because the payload hash no longer matches the signature. Server rejects the request with HTTP 401 Unauthorized.</div></div>
+<div class="q-card"><div class="q-title">Q80: What is token expiration (`exp` claim)?</div><div class="q-answer">A timestamp payload claim defining when the token expires (e.g. 24h). `jsonwebtoken` rejects expired tokens automatically during `jwt.verify()`.</div></div>
+
+<div class="domain-header">DOMAIN 9: SYSTEM DESIGN & SCALABILITY (Q81 - Q90)</div>
+
+<div class="q-card"><div class="q-title">Q81: How would you scale this system to handle 100,000 requests per second?</div><div class="q-answer">1. Place NGINX / AWS ALB Load Balancer in front of multiple Node.js stateless API instances. <br>2. Replace in-memory Map with a Redis Cluster. <br>3. Replace SQLite with PostgreSQL sharded database cluster with read replicas. <br>4. Use Apache Kafka or RabbitMQ for high-throughput click analytics queueing.</div>
+</div>
+<div class="q-card"><div class="q-title">Q82: How do you handle database write bottlenecks under heavy traffic?</div><div class="q-answer">Use asynchronous message queues (RabbitMQ/Kafka) to buffer click analytics writes. Return instant HTTP redirects to users and write analytics to the database in batch background jobs.</div></div>
+<div class="q-card"><div class="q-title">Q83: What is Horizontal vs Vertical Scaling?</div><div class="q-answer">Vertical Scaling: adding more RAM/CPU to a single server instance. Horizontal Scaling: adding more server nodes behind a load balancer.</div></div>
+<div class="q-card"><div class="q-title">Q84: How do you scale Base62 counter generation across multiple backend servers?</div><div class="q-answer">Use Twitter Snowflake IDs (timestamp + node ID + sequence) or allocate non-overlapping integer range blocks to each backend server node (e.g. Node 1 handles 1-1M, Node 2 handles 1M-2M).</div></div>
+<div class="q-card"><div class="q-title">Q85: What is CDN Edge Caching for short URLs?</div><div class="q-answer">Caching popular HTTP 302 short URL redirects at Cloudflare/AWS CloudFront edge nodes globally, fulfilling redirects geographically close to users without hitting origin servers.</div></div>
+<div class="q-card"><div class="q-title">Q86: How would you implement expiration/TTL for short links?</div><div class="q-answer">Add an `expires_at` DATETIME column in SQLite. During `GET /r/:code`, check if `expires_at < CURRENT_TIMESTAMP`. If true, return HTTP 410 Gone. Run a nightly cleanup cron job to delete expired rows.</div></div>
+<div class="q-card"><div class="q-title">Q87: What is database sharding?</div><div class="q-answer">Partitioning a large database horizontally across multiple independent database servers using a shard key (e.g. `hash(short_code) % server_count`).</div></div>
+<div class="q-card"><div class="q-title">Q88: What is CAP Theorem?</div><div class="q-answer">A distributed system can satisfy at most 2 of 3 guarantees: Consistency (all nodes see same data), Availability (every request receives a non-error response), and Partition Tolerance (system operates despite network breaks).</div></div>
+<div class="q-card"><div class="q-title">Q89: What is Single Point of Failure (SPOF)?</div><div class="q-answer">A component whose failure stops the entire system (e.g., a single non-replicated database server). Eliminated using master-slave replication and failover instances.</div></div>
+<div class="q-card"><div class="q-title">Q90: How would you implement custom analytics per country?</div><div class="q-answer">Lookup client IP addresses against a GeoIP2 database (like MaxMind) during async analytics logging to extract `country_code` and `city`, storing them in the analytics database table.</div></div>
+
+<div class="domain-header">DOMAIN 10: DEVOPS, CI/CD & DEBUGGING (Q91 - Q100)</div>
+
+<div class="q-card"><div class="q-title">Q91: What is CI/CD?</div><div class="q-answer">Continuous Integration (automatically building and testing code on commit) and Continuous Deployment (automatically deploying verified code to production environments).</div></div>
+<div class="q-card"><div class="q-title">Q92: What is GitHub Actions?</div><div class="q-answer">A CI/CD platform integrated into GitHub that executes automated workflow jobs (testing, building, linting) triggered by repository events like `git push` or pull requests.</div></div>
+<div class="q-card"><div class="q-title">Q93: Explain your GitHub Actions workflow configuration.</div><div class="q-answer">Configured in `.github/workflows/ci.yml`. It spins up an Ubuntu virtual machine, installs Node.js 22, runs `npm install`, and verifies frontend and backend builds compile cleanly without errors.</div></div>
+<div class="q-card"><div class="q-title">Q94: What is `.gitignore` and why is it important?</div><div class="q-answer">A configuration file specifying files and folders Git should untrack (e.g. `node_modules/`, `.env` secret keys, `database.sqlite`). Prevents uploading bloated dependencies or security secrets to GitHub.</div></div>
+<div class="q-card"><div class="q-title">Q95: How do you debug `ECONNREFUSED` errors in Node.js?</div><div class="q-answer">`ECONNREFUSED` means a network connection attempt failed because no service is listening on the target port or IP address. Debug by checking if the target server process is running and port numbers match.</div></div>
+<div class="q-card"><div class="q-title">Q96: How do you measure API response latency?</div><div class="q-answer">Using high-resolution timers `performance.now()` before and after request processing, or logging timing metrics using Express middleware like `morgan`.</div></div>
+<div class="q-card"><div class="q-title">Q97: What is PM2 in Node.js production deployment?</div><div class="q-answer">A production process manager for Node.js that keeps applications running continuously, reloads them without downtime on crashes, and enables cluster mode execution across CPU cores.</div></div>
+<div class="q-card"><div class="q-title">Q98: What is Semantic Versioning (SemVer)?</div><div class="q-answer">A 3-part version numbering system: `MAJOR.MINOR.PATCH` (e.g. `1.4.2`). Major = breaking changes, Minor = new backwards-compatible features, Patch = bug fixes.</div></div>
+<div class="q-card"><div class="q-title">Q99: How do you handle database migration scripts?</div><div class="q-answer">Using version-controlled migration files (via tools like Knex or Prisma) that execute sequential SQL statements (`UP` and `DOWN`) to alter database structure reproducibly across environments.</div></div>
+<div class="q-card"><div class="q-title">Q100: How do you verify your project is ready for an interview demonstration?</div><div class="q-answer">Ensure backend starts (`node index.js`), frontend dev server starts (`npm run dev`), user registration/login succeeds, short link creation works without token errors, redirect resolves, analytics update, and GitHub Actions CI build passes green.</div></div>
+
+</body>
+</html>
